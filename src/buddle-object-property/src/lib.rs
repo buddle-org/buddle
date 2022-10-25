@@ -17,6 +17,9 @@
     decl_macro
 )]
 
+mod r#type;
+pub use self::r#type::*;
+
 #[doc(hidden)]
 pub mod __private {
     /// Computes the offset to a struct field for

@@ -18,9 +18,16 @@
     const_type_id,
     const_type_name,
 
+    // Enables reflected access to `dyn Type` properties.
+    pointer_byte_offsets,
+    ptr_metadata,
+
     // Better macro ergonomics.
     decl_macro
 )]
+
+mod property_class;
+pub use self::property_class::*;
 
 pub mod type_info;
 

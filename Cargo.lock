@@ -5,3 +5,7 @@ version = 3
 [[package]]
 name = "buddle"
 version = "0.1.0"
+
+[[package]]
+name = "buddle-object-property"
+version = "0.1.0"

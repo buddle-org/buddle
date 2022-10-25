@@ -71,7 +71,7 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
         if let Some(base) = base {
             let ident = &base.ident;
             let base_ty = base.ty;
-            let info = base.info();
+            let info = base.info(path);
             quote! {
                 unsafe {
                     ::std::option::Option::Some(#path::type_info::Property::new_base::<#base_ty>(
@@ -95,12 +95,13 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
     let names = fields.iter().map(|f| f.name());
     let field_count = fields.len();
     let flags = fields.iter().map(|f| f.flags());
-    let infos = fields.iter().map(|f| f.info());
+    let infos = fields.iter().map(|f| f.info(path));
     let on_pre_load = input.on_pre_load();
     let on_post_load = input.on_post_load();
     let on_pre_save = input.on_pre_save();
     let on_post_save = input.on_post_save();
 
+    let reflected = spanned_trait!(type_info::Reflected, input.original, path);
     let type_trait = spanned_trait!(Type, input.original, path);
     let property_class = spanned_trait!(PropertyClass, input.original, path);
 
@@ -109,8 +110,6 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
         // get a PropertyList since they are non-leaf types.
         // We correctly reflect all the properties in the list.
         const _: () = {
-            use #path::type_info::Reflected as __Reflected;
-
             const __PROPERTIES: [#path::type_info::Property; #field_count] = [
                 #(
                     unsafe {
@@ -126,7 +125,7 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
                 ),*
             ];
 
-            unsafe impl #impl_generics __Reflected for #ty #ty_generics
+            unsafe impl #impl_generics #reflected for #ty #ty_generics
                 #where_clause
             {
                 const TYPE_INFO: &'static #path::type_info::TypeInfo = unsafe {
@@ -201,7 +200,7 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
     let names: Vec<_> = input.variants.iter().map(|v| v.name()).collect();
     let discrims: Vec<_> = input.variants.iter().map(|v| &v.discriminant).collect();
 
-    let static_reflected = spanned_trait!(type_info::Reflected, input.original, path);
+    let reflected = spanned_trait!(type_info::Reflected, input.original, path);
     let type_trait = spanned_trait!(Type, input.original, path);
     let enum_trait = spanned_trait!(Enum, input.original, path);
 
@@ -209,7 +208,7 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
         // SAFETY: Enums are always leaf types by nature.
         // We capture the correct type the derive macro was
         // used on and go with the default Rust type name.
-        unsafe impl #impl_generics #static_reflected for #ty #ty_generics
+        unsafe impl #impl_generics #reflected for #ty #ty_generics
             #where_clause
         {
             const TYPE_INFO: &'static #path::type_info::TypeInfo =

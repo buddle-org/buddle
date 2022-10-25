@@ -177,7 +177,7 @@ impl<'a> Field<'a> {
             .unwrap_or_else(|| self.ident.to_string())
     }
 
-    pub fn info(&self) -> syn::Expr {
+    pub fn info(&self, path: &syn::Path) -> syn::Expr {
         self.attrs
             .property
             .as_ref()
@@ -185,7 +185,7 @@ impl<'a> Field<'a> {
             .unwrap_or_else(|| {
                 let ty = self.ty;
 
-                let expr = quote!(<#ty as __Reflected>::TYPE_INFO);
+                let expr = quote!(<#ty as #path::type_info::Reflected>::TYPE_INFO);
                 syn::parse2(expr).unwrap()
             })
     }

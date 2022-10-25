@@ -13,9 +13,16 @@
     unsafe_op_in_unsafe_fn
 )]
 #![feature(
+    // Compile-time type info for static reflection.
+    const_option_ext,
+    const_type_id,
+    const_type_name,
+
     // Better macro ergonomics.
     decl_macro
 )]
+
+pub mod type_info;
 
 mod r#type;
 pub use self::r#type::*;

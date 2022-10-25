@@ -1,5 +1,7 @@
 use std::any::{Any, TypeId};
 
+use crate::type_info::DynReflected;
+
 /// A reflected Rust type in the *ObjectProperty* system.
 ///
 /// # Correctness
@@ -17,7 +19,7 @@ use std::any::{Any, TypeId};
 ///
 /// - [`Type::as_type`] and [`Type::as_type_mut`] should
 ///   always return `self`.
-pub trait Type: Any + Sync + Send {
+pub trait Type: Any + Sync + Send + DynReflected + 'static {
     /// Gets the value as an [`Any`] reference.
     fn as_any(&self) -> &dyn Any;
 

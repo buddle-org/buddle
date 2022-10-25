@@ -29,6 +29,9 @@
 mod container;
 pub use self::container::*;
 
+mod r#enum;
+pub use self::r#enum::*;
+
 mod property_class;
 pub use self::property_class::*;
 

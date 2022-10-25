@@ -1,6 +1,32 @@
 use std::any::{Any, TypeId};
 
-use crate::type_info::DynReflected;
+use crate::{type_info::DynReflected, Container, Enum, PropertyClass};
+
+/// An immutable reference to a value categorized by
+/// varying data types.
+pub enum TypeRef<'ty> {
+    /// A property class reference.
+    Class(&'ty dyn PropertyClass),
+    /// A container reference.
+    Container(&'ty dyn Container),
+    /// An enum reference.
+    Enum(&'ty dyn Enum),
+    /// A regular value reference.
+    Value(&'ty dyn Type),
+}
+
+/// A mutable reference to a value categorized by
+/// varying data types.
+pub enum TypeMut<'ty> {
+    /// A property class reference.
+    Class(&'ty mut dyn PropertyClass),
+    /// A container reference.
+    Container(&'ty mut dyn Container),
+    /// An enum reference.
+    Enum(&'ty mut dyn Enum),
+    /// A regular value reference.
+    Value(&'ty mut dyn Type),
+}
 
 /// A reflected Rust type in the *ObjectProperty* system.
 ///
@@ -31,6 +57,12 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
 
     /// Gets the value as a [`Type`] reference.
     fn as_type_mut(&mut self) -> &mut dyn Type;
+
+    /// Gets `self` as a [`TypeRef`].
+    fn type_ref(&self) -> TypeRef<'_>;
+
+    /// Gets `self` as a [`TypeMut`].
+    fn type_mut(&mut self) -> TypeMut<'_>;
 }
 
 impl dyn Type {

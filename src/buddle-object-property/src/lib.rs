@@ -26,11 +26,16 @@
     decl_macro
 )]
 
+#[doc(inline)]
+pub use buddle_object_property_macros::*;
+
 mod container;
 pub use self::container::*;
 
 mod r#enum;
 pub use self::r#enum::*;
+
+mod impls;
 
 mod property_class;
 pub use self::property_class::*;

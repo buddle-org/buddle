@@ -8,4 +8,6 @@ repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
+buddle-object-property-macros = { path = "macros" }
+
 bitflags = "1.3"

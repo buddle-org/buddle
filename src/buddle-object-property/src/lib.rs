@@ -26,6 +26,9 @@
     decl_macro
 )]
 
+mod container;
+pub use self::container::*;
+
 mod property_class;
 pub use self::property_class::*;
 

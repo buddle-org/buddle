@@ -12,6 +12,11 @@ pub trait Container: Type {
     fn get_mut(&mut self, idx: usize) -> Option<&mut dyn Type>;
 
     /// Appends a new element to the back.
+    ///
+    /// # Panics
+    ///
+    /// Implementations may panic when type-checking
+    /// `value` for the underlying container fials.
     fn push(&mut self, value: Box<dyn Type>);
 
     /// Removes an element from the back.

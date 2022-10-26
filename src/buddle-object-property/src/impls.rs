@@ -53,6 +53,12 @@ macro_rules! impl_type_for {
             fn type_mut(&mut self) -> TypeMut<'_> {
                 TypeMut::Value(self)
             }
+
+            #[inline]
+            fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
+                *self = *value.downcast()?;
+                Ok(())
+            }
         }
     };
 }

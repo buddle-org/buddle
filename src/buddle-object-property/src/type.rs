@@ -63,6 +63,13 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
 
     /// Gets `self` as a [`TypeMut`].
     fn type_mut(&mut self) -> TypeMut<'_>;
+
+    /// Attempts to perform a type-checked assignment of
+    /// `value` to `self`.
+    ///
+    /// If the types are incompatible with each other, then
+    /// `value` will be passed back in the [`Err`] variant.
+    fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>>;
 }
 
 impl dyn Type {

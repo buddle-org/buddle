@@ -13,7 +13,7 @@ fn basic_reflection() {
         b: i32,
     }
 
-    let x: Box<dyn PropertyClass> = Box::new(Foo { a: 7, b: -5 });
+    let mut x: Box<dyn PropertyClass> = Box::new(Foo { a: 7, b: -5 });
     let list = x.property_list();
 
     assert!(x.base().is_none());
@@ -25,6 +25,8 @@ fn basic_reflection() {
 
     let b_access = list.property("c").unwrap();
     assert_eq!(x.property_as::<i32>(b_access), Some(&-5));
+    x.property_mut(b_access).unwrap().set(Box::new(-6_i32)).ok();
+    assert_eq!(x.property_as::<i32>(b_access), Some(&-6));
 }
 
 #[test]
@@ -79,8 +81,8 @@ fn fake_inheritance() {
     let b: Box<dyn PropertyClass> = Box::new(b);
 
     assert_eq!(
-        b.base_as::<A>().map(|a| a.test),
-        c.base_as::<A>().map(|a| a.test)
+        b.base_as::<A>().unwrap().test,
+        c.base_as::<A>().unwrap().test
     );
 }
 

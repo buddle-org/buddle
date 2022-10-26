@@ -170,6 +170,15 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
             fn type_mut(&mut self) -> #path::TypeMut<'_> {
                 #path::TypeMut::Class(self)
             }
+
+            #[inline]
+            fn set(
+                &mut self,
+                value: ::std::boxed::Box<dyn #path::Type>,
+            ) -> ::std::result::Result<(), ::std::boxed::Box<dyn #path::Type>> {
+                *self = *value.downcast()?;
+                ::std::result::Result::Ok(())
+            }
         }
 
         impl #impl_generics #property_class for #ty #ty_generics #where_clause {
@@ -246,6 +255,15 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
             #[inline]
             fn type_mut(&mut self) -> #path::TypeMut<'_> {
                 #path::TypeMut::Enum(self)
+            }
+
+            #[inline]
+            fn set(
+                &mut self,
+                value: ::std::boxed::Box<dyn #path::Type>,
+            ) -> ::std::result::Result<(), ::std::boxed::Box<dyn #path::Type>> {
+                *self = *value.downcast()?;
+                ::std::result::Result::Ok(())
             }
         }
 

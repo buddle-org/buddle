@@ -1,6 +1,10 @@
 use std::any::{Any, TypeId};
 
-use crate::{type_info::DynReflected, Container, Enum, PropertyClass};
+use crate::{
+    serde::{self, Serialize},
+    type_info::DynReflected,
+    Container, Enum, PropertyClass,
+};
 
 /// An immutable reference to a value categorized by
 /// varying data types.
@@ -70,6 +74,20 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
     /// If the types are incompatible with each other, then
     /// `value` will be passed back in the [`Err`] variant.
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>>;
+
+    /// Gets `self` as an instance of [`Serialize`] for
+    /// dynamic serialization.
+    ///
+    /// Types that do not support serialization do not
+    /// have to override this method.
+    ///
+    /// All others should implement the [`Serialize`]
+    /// trait and return `Ok(self)`.
+    fn as_serialize(&self) -> serde::Result<&dyn Serialize> {
+        Err(serde::Error::custom(
+            "this type does not support serialization",
+        ))
+    }
 }
 
 impl dyn Type {

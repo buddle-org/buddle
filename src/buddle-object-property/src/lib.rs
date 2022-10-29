@@ -40,6 +40,8 @@ mod impls;
 mod property_class;
 pub use self::property_class::*;
 
+pub mod serde;
+
 pub mod type_info;
 
 mod r#type;

@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 
 use crate::{
-    serde::{self, Serialize},
+    serde::{self, de::Deserialize, ser::Serialize},
     type_info::DynReflected,
     Container, Enum, PropertyClass,
 };
@@ -86,6 +86,20 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
     fn as_serialize(&self) -> serde::Result<&dyn Serialize> {
         Err(serde::Error::custom(
             "this type does not support serialization",
+        ))
+    }
+
+    /// Gets `self` as an instance of [`Deserialize`] for
+    /// dynamic deserialization.
+    ///
+    /// Types that do not support serialization do not
+    /// have to override this method.
+    ///
+    /// All others should implement the [`Deserialize`]
+    /// trait and return `Ok(self)`.
+    fn as_deserialize(&mut self) -> serde::Result<&mut dyn Deserialize> {
+        Err(serde::Error::custom(
+            "this type does not support deserialization",
         ))
     }
 }

@@ -1,5 +1,9 @@
-use super::result::*;
-use crate::{Container, Enum, PropertyClass};
+//! Serialization facilities for reflected types.
+
+use std::marker::PhantomData;
+
+use super::{result::*, Baton};
+use crate::{type_info::PropertyList, Container, Enum, PropertyClass};
 
 mod sealed {
     pub trait Sealed {}
@@ -8,7 +12,7 @@ mod sealed {
 /// A type that supports serialization.
 pub trait Serialize {
     /// Serializes `self` to the given `serializer`.
-    fn serialize(&self, serializer: &mut dyn DynSerializer) -> Result<()>;
+    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> Result<()>;
 }
 
 /// Defines the encoding of primitive types into the format.
@@ -59,23 +63,37 @@ pub trait Marshal {
 }
 
 /// Defines the handling of the data format around the
-/// marshalling of types.
+/// marshalling of primitive types.
 pub trait Layout {
+    /// Serializes the *identity* of a [`PropertyClass`]
+    /// into the described format.
+    ///
+    /// The identity is a per-class unique piece of
+    /// information the deserializer can use to dynamically
+    /// identify the serialized object's type.
+    fn identity(
+        &mut self,
+        m: &mut dyn Marshal,
+        v: &'static PropertyList,
+        baton: Baton,
+    ) -> Result<()>;
+
     /// Serializes a [`PropertyClass`] object into the
     /// described format.
     ///
-    /// NOTE: In some cases, the value of a [`PropertyClass`]
-    /// may not be available. It is then recommended to
-    /// pass [`None`] to indicate that.
-    fn class(&mut self, m: &mut dyn Marshal, v: Option<&dyn PropertyClass>) -> Result<()>;
+    /// NOTE: This should NOT serialize the identity of
+    /// the object with [`Layout::identity`]. Instead,
+    /// the [`Serialize`] impls of every [`PropertyClass`]
+    /// are responsible for that.
+    fn class(&mut self, m: &mut dyn Marshal, v: &dyn PropertyClass, baton: Baton) -> Result<()>;
 
     /// Serializes a [`Container`] object into the
     /// described format.
-    fn container(&mut self, m: &mut dyn Marshal, v: &dyn Container) -> Result<()>;
+    fn container(&mut self, m: &mut dyn Marshal, v: &dyn Container, baton: Baton) -> Result<()>;
 
     /// Serializes an [`Enum`] variant into the
     /// described format.
-    fn enum_variant(&mut self, m: &mut dyn Marshal, v: &dyn Enum) -> Result<()>;
+    fn enum_variant(&mut self, m: &mut dyn Marshal, v: &dyn Enum, baton: Baton) -> Result<()>;
 }
 
 /// Type-erased [`Serializer`] that can be passed to
@@ -85,34 +103,60 @@ pub trait DynSerializer: sealed::Sealed {
     /// marshalling primitives.
     fn marshal(&mut self) -> &mut dyn Marshal;
 
+    /// Whether this serializer produces human-readable
+    /// (text-based) or binary output.
+    fn human_readable(&self) -> bool;
+
+    /// Serializes the *identity* of a [`PropertyClass`]
+    /// into the described format.
+    ///
+    /// The identity is a per-class unique piece of
+    /// information the deserializer can use to dynamically
+    /// identify the serialized object's type.
+    fn identity(&mut self, v: &'static PropertyList, baton: Baton) -> Result<()>;
+
     /// Serializes a [`PropertyClass`] object into the
     /// described format.
-    ///
-    /// NOTE: In some cases, the value of a [`PropertyClass`]
-    /// may not be available. It is then recommended to
-    /// pass [`None`] to indicate that.
-    fn class(&mut self, v: Option<&dyn PropertyClass>) -> Result<()>;
+    fn class(&mut self, v: &dyn PropertyClass, baton: Baton) -> Result<()>;
 
     /// Serializes a [`Container`] object into the
     /// described format.
-    fn container(&mut self, v: &dyn Container) -> Result<()>;
+    fn container(&mut self, v: &dyn Container, baton: Baton) -> Result<()>;
 
     /// Serializes an [`Enum`] variant into the
     /// described format.
-    fn enum_variant(&mut self, v: &dyn Enum) -> Result<()>;
+    fn enum_variant(&mut self, v: &dyn Enum, baton: Baton) -> Result<()>;
+}
+
+/// An extension trait for adding custom pre and post
+/// serialization logic to [`Serializer`].
+pub trait SerializerExt: Sized {
+    /// A result type produced by [`SerializerExt::post`].
+    type Res;
+
+    /// Custom logic before serialization.
+    fn pre<M, L>(serializer: &mut Serializer<M, L, Self>) -> Result<()>;
+
+    /// Custom logic after serialization.
+    fn post<M, L>(serializer: Serializer<M, L, Self>) -> Result<Self::Res>;
 }
 
 /// A serializer for reflected values that wraps
 /// [`Marshal`] and [`Layout`] strategies.
-pub struct Serializer<M, L> {
+pub struct Serializer<M, L, Ext> {
     marshal: M,
     layout: L,
+    _ext: PhantomData<Ext>,
 }
 
-impl<M, L> Serializer<M, L> {
+impl<M, L, Ext> Serializer<M, L, Ext> {
     /// Creates a new serializer from the given data.
     pub const fn new(marshal: M, layout: L) -> Self {
-        Self { marshal, layout }
+        Self {
+            marshal,
+            layout,
+            _ext: PhantomData,
+        }
     }
 
     /// Provides mutable access to the serializer's
@@ -130,24 +174,46 @@ impl<M, L> Serializer<M, L> {
     }
 }
 
-impl<M: Marshal, L: Layout> Serializer<M, L> {}
+impl<M: Marshal, L: Layout, Ext: SerializerExt> Serializer<M, L, Ext> {
+    /// Serializes the given `obj` to a persistent format.
+    pub fn serialize(mut self, obj: &mut dyn PropertyClass) -> Result<Ext::Res> {
+        let baton = Baton(());
 
-impl<M, L> sealed::Sealed for Serializer<M, L> {}
+        Ext::pre(&mut self)?;
 
-impl<M: Marshal, L: Layout> DynSerializer for Serializer<M, L> {
+        obj.on_pre_load();
+        self.layout.identity(&mut self.marshal, obj.property_list(), baton)?;
+        self.layout.class(&mut self.marshal, obj, baton)?;
+        obj.on_post_load();
+
+        Ext::post(self)
+    }
+}
+
+impl<M, L, Ext> sealed::Sealed for Serializer<M, L, Ext> {}
+
+impl<M: Marshal, L: Layout, Ext: SerializerExt> DynSerializer for Serializer<M, L, Ext> {
     fn marshal(&mut self) -> &mut dyn Marshal {
         self.marshal()
     }
 
-    fn class(&mut self, v: Option<&dyn PropertyClass>) -> Result<()> {
-        self.layout.class(&mut self.marshal, v)
+    fn human_readable(&self) -> bool {
+        self.marshal.human_readable()
     }
 
-    fn container(&mut self, v: &dyn Container) -> Result<()> {
-        self.layout.container(&mut self.marshal, v)
+    fn identity(&mut self, v: &'static PropertyList, baton: Baton) -> Result<()> {
+        self.layout.identity(&mut self.marshal, v, baton)
     }
 
-    fn enum_variant(&mut self, v: &dyn Enum) -> Result<()> {
-        self.layout.enum_variant(&mut self.marshal, v)
+    fn class(&mut self, v: &dyn PropertyClass, baton: Baton) -> Result<()> {
+        self.layout.class(&mut self.marshal, v, baton)
+    }
+
+    fn container(&mut self, v: &dyn Container, baton: Baton) -> Result<()> {
+        self.layout.container(&mut self.marshal, v, baton)
+    }
+
+    fn enum_variant(&mut self, v: &dyn Enum, baton: Baton) -> Result<()> {
+        self.layout.enum_variant(&mut self.marshal, v, baton)
     }
 }

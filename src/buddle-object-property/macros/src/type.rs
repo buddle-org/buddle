@@ -182,6 +182,13 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
         }
 
         impl #impl_generics #property_class for #ty #ty_generics #where_clause {
+            fn make_default() -> ::std::boxed::Box<dyn #property_class>
+            where
+                Self: ::std::marker::Sized,
+            {
+                ::std::boxed::Box::new(Self::default())
+            }
+
             fn on_pre_save(&mut self) {
                 let _ = #on_pre_save(self);
             }

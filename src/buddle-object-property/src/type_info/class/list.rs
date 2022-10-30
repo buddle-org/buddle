@@ -14,6 +14,7 @@ pub struct PropertyList {
 
     base: Option<Property>,
     properties: &'static [Property],
+    default_fn: fn() -> Box<dyn PropertyClass>,
 
     class_meta: DynMetadata<dyn PropertyClass>,
 }
@@ -59,6 +60,7 @@ impl PropertyList {
 
             base,
             properties,
+            default_fn: T::make_default,
 
             class_meta: ptr::metadata::<dyn PropertyClass>(ptr::null::<T>()),
         }
@@ -86,6 +88,16 @@ impl PropertyList {
     #[inline]
     pub fn is<T: ?Sized + 'static>(&self) -> bool {
         self.type_info.is::<T>()
+    }
+
+    /// Creates a default instance of the represented
+    /// [`PropertyClass`] type.
+    ///
+    /// This calls the [`PropertyClass::make_default`]
+    /// method and returns its result.
+    #[inline]
+    pub fn make_default(&self) -> Box<dyn PropertyClass> {
+        (self.default_fn)()
     }
 
     /// Gets the [`PropertyList`] for the base class type,

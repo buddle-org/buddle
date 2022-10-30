@@ -5,7 +5,7 @@ use buddle_object_property::{
 
 #[test]
 fn basic_reflection() {
-    #[derive(Type)]
+    #[derive(Default, Type)]
     pub struct Foo {
         #[property()]
         a: u32,
@@ -33,7 +33,7 @@ fn basic_reflection() {
 fn custom_type_info() {
     const U32: TypeInfo = TypeInfo::leaf::<u32>(Some("u32"));
 
-    #[derive(Type)]
+    #[derive(Default, Type)]
     pub struct Foo {
         #[property()]
         a: u32,
@@ -56,18 +56,18 @@ fn custom_type_info() {
 
 #[test]
 fn fake_inheritance() {
-    #[derive(Clone, Copy, Type)]
+    #[derive(Clone, Copy, Default, Type)]
     pub struct A {
         test: u32,
     }
 
-    #[derive(Clone, Copy, Type)]
+    #[derive(Clone, Copy, Default, Type)]
     pub struct B {
         #[property(base)]
         base: A,
     }
 
-    #[derive(Clone, Copy, Type)]
+    #[derive(Clone, Copy, Default, Type)]
     pub struct C {
         #[property(base)]
         base: B,
@@ -111,7 +111,7 @@ fn property_flags() {
 
 #[test]
 fn object_name() {
-    #[derive(Type)]
+    #[derive(Default, Type)]
     #[object(name = "Bar")]
     pub struct Foo {}
 

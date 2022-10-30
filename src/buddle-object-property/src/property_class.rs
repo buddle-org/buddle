@@ -42,6 +42,12 @@ pub trait PropertyClass: Type {
         unsafe_debug_unwrap!((self.type_info()): TypeInfo::Class(list) => list)
     }
 
+    /// Creates a default instance of this type as a
+    /// reflected value.
+    fn make_default() -> Box<dyn PropertyClass>
+    where
+        Self: Sized;
+
     /// Provides reflective immutable access to a property's
     /// value.
     ///

@@ -2,6 +2,8 @@
 
 use core::fmt::{self, Display};
 
+/// A [`Result`][std::result::Result] produced by this
+/// module's operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Error when serialization or deserialization through a

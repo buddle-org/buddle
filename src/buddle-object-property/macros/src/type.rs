@@ -186,7 +186,7 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
             where
                 Self: ::std::marker::Sized,
             {
-                ::std::boxed::Box::new(Self::default())
+                <::std::boxed::Box::<Self> as ::std::default::Default>::default()
             }
 
             fn on_pre_save(&mut self) {

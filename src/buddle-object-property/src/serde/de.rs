@@ -9,13 +9,6 @@ mod sealed {
     pub trait Sealed {}
 }
 
-/// A type that supports deserialization.
-pub trait Deserialize {
-    /// Deserializes `self` in-place from the given
-    /// `deserializer`.
-    fn deserialize(&mut self, deserializer: &mut dyn DynDeserializer, baton: Baton) -> Result<()>;
-}
-
 /// Defines the decoding of primitive types from the format.
 ///
 /// This is the foundation for format-agnostic deserialization
@@ -210,8 +203,7 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> Deserializer<M, L, Ext> {
         Ext::pre(&mut self)?;
 
         obj.on_pre_load();
-        let deserialize = obj.as_deserialize()?;
-        deserialize.deserialize(&mut self, baton)?;
+        obj.deserialize(&mut self, baton)?;
         obj.on_post_load();
 
         Ext::post(self)

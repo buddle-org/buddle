@@ -9,12 +9,6 @@ mod sealed {
     pub trait Sealed {}
 }
 
-/// A type that supports serialization.
-pub trait Serialize {
-    /// Serializes `self` to the given `serializer`.
-    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> Result<()>;
-}
-
 /// Defines the encoding of primitive types into the format.
 ///
 /// This is the foundation for format-agnostic serialization

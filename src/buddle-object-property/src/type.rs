@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 
 use crate::{
-    serde::{self, de::Deserialize, ser::Serialize},
+    serde::{self, de::DynDeserializer, ser::DynSerializer, Baton},
     type_info::DynReflected,
     Container, Enum, PropertyClass,
 };
@@ -75,29 +75,27 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
     /// `value` will be passed back in the [`Err`] variant.
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>>;
 
-    /// Gets `self` as an instance of [`Serialize`] for
-    /// dynamic serialization.
+    /// Serializes `self` to the given serializer.
     ///
     /// Types that do not support serialization do not
     /// have to override this method.
-    ///
-    /// All others should implement the [`Serialize`]
-    /// trait and return `Ok(self)`.
-    fn as_serialize(&self) -> serde::Result<&dyn Serialize> {
+    #[allow(unused_variables)]
+    fn serialize(&mut self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
         Err(serde::Error::custom(
             "this type does not support serialization",
         ))
     }
 
-    /// Gets `self` as an instance of [`Deserialize`] for
-    /// dynamic deserialization.
+    /// Deserializes `self` from the given deserializer.
     ///
     /// Types that do not support serialization do not
     /// have to override this method.
-    ///
-    /// All others should implement the [`Deserialize`]
-    /// trait and return `Ok(self)`.
-    fn as_deserialize(&mut self) -> serde::Result<&mut dyn Deserialize> {
+    #[allow(unused_variables)]
+    fn deserialize(
+        &mut self,
+        deserializer: &mut dyn DynDeserializer,
+        baton: Baton,
+    ) -> serde::Result<()> {
         Err(serde::Error::custom(
             "this type does not support deserialization",
         ))

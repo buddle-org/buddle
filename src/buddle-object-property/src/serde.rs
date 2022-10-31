@@ -1,4 +1,4 @@
-//! Serialization support for [`PropertyClass`]es.
+//! Serialization support for `PropertyClass`es.
 //!
 //! NOTE: This is not related to the popular `serde` crate
 //! as its design choices are clashing with the requirements
@@ -17,8 +17,7 @@ pub mod ser;
 /// calling methods they are not supposed to call out of
 /// context.
 ///
-/// Only [`Serializer`]s and [`Deserializer`]s create
-/// instances of this type when they start with a root
-/// object.
+/// Only `Serializer`s and `Deserializer`s create instances
+/// of this type when they start with a root object.
 #[derive(Clone, Copy)]
 pub struct Baton(pub(super) ());

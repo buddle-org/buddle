@@ -72,8 +72,8 @@ pub trait Layout {
     ///
     /// NOTE: This should NOT deserialize the identity of
     /// the object with [`Layout::identity`]. Instead,
-    /// the [`Serialize`] impls of every [`PropertyClass`]
-    /// are responsible for that.
+    /// the deserialization logic of every [`PropertyClass`]
+    /// is responsible for that.
     fn class(
         &mut self,
         m: &mut dyn Unmarshal,
@@ -120,8 +120,8 @@ pub trait DynDeserializer: sealed::Sealed {
     ///
     /// NOTE: This should NOT deserialize the identity of
     /// the object with [`Layout::identity`]. Instead,
-    /// the [`Serialize`] impls of every [`PropertyClass`]
-    /// are responsible for that.
+    /// the deserialization logic of every [`PropertyClass`]
+    /// is responsible for that.
     fn class(&mut self, v: &mut dyn PropertyClass, baton: Baton) -> Result<()>;
 
     /// Deserializes a [`Container`] object in-place from the

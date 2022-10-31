@@ -101,7 +101,7 @@ fn parse_object_attr<'a>(attrs: &mut Attrs<'a>, attr: &'a Attribute) -> Result<(
     }
     let object = attrs.object.as_mut().unwrap();
 
-    attr.parse_args_with(|input: ParseStream| {
+    attr.parse_args_with(|input: ParseStream<'_>| {
         let look = input.lookahead1();
         if look.peek(kw::name) {
             if object.name.is_some() {
@@ -189,7 +189,7 @@ fn parse_property_attr<'a>(attrs: &mut Attrs<'a>, attr: &'a Attribute) -> Result
     }
     let property = attrs.property.as_mut().unwrap();
 
-    attr.parse_args_with(|input: ParseStream| {
+    attr.parse_args_with(|input: ParseStream<'_>| {
         let mut first = true;
         while !input.is_empty() {
             if !first {
@@ -273,7 +273,7 @@ fn parse_option_attr<'a>(attrs: &mut Attrs<'a>, attr: &'a Attribute) -> Result<(
     }
     let option = attrs.option.as_mut().unwrap();
 
-    attr.parse_args_with(|input: ParseStream| {
+    attr.parse_args_with(|input: ParseStream<'_>| {
         let look = input.lookahead1();
         if look.peek(kw::name) {
             if option.name.is_some() {
@@ -300,7 +300,7 @@ struct AttrWrapper<K, V> {
 }
 
 impl<K: Parse, V: Parse> Parse for AttrWrapper<K, V> {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let ident = input.parse()?;
         let value = if input.peek(token::Paren) {
             // #[ident(value)]
@@ -317,7 +317,7 @@ impl<K: Parse, V: Parse> Parse for AttrWrapper<K, V> {
     }
 }
 
-fn parse_mod_path<K: Parse>(input: ParseStream) -> Result<syn::Path> {
+fn parse_mod_path<K: Parse>(input: ParseStream<'_>) -> Result<syn::Path> {
     input.parse::<K>()?;
     if input.peek(token::Paren) {
         // #[ident(path)]

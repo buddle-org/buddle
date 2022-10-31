@@ -77,8 +77,8 @@ pub trait Layout {
     ///
     /// NOTE: This should NOT serialize the identity of
     /// the object with [`Layout::identity`]. Instead,
-    /// the [`Serialize`] impls of every [`PropertyClass`]
-    /// are responsible for that.
+    /// the serialization logic of every [`PropertyClass`]
+    /// is responsible for that.
     fn class(&mut self, m: &mut dyn Marshal, v: &dyn PropertyClass, baton: Baton) -> Result<()>;
 
     /// Serializes a [`Container`] object into the

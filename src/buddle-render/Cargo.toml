@@ -1,0 +1,16 @@
+[package]
+name = "buddle-render"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+license = "GPL-2.0"
+repository = "https://github.com/buddle-org/buddle.git"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+egui = "0.19.0"
+env_logger = "0.9.1"
+serde = "1.0.147"
+wgpu = "0.14.0"
+winit = "0.27.5"

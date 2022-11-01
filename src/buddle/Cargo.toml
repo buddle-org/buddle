@@ -7,3 +7,4 @@ repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
+buddle-render = { path = "../buddle-render" }

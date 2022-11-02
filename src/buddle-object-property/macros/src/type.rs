@@ -179,6 +179,22 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
                 *self = *value.downcast()?;
                 ::std::result::Result::Ok(())
             }
+
+            fn serialize(
+                &self,
+                serializer: &mut dyn #path::serde::ser::DynSerializer,
+                baton: #path::serde::Baton,
+            ) -> #path::serde::Result<()> {
+                #path::serde::serialize_class(serializer, self, baton)
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn #path::serde::de::DynDeserializer,
+                baton: #path::serde::Baton,
+            ) -> #path::serde::Result<()> {
+                #path::serde::deserialize_class(deserializer, self, baton)
+            }
         }
 
         impl #impl_generics #property_class for #ty #ty_generics #where_clause {
@@ -272,6 +288,22 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
                 *self = *value.downcast()?;
                 ::std::result::Result::Ok(())
             }
+
+            fn serialize(
+                &self,
+                serializer: &mut dyn #path::serde::ser::DynSerializer,
+                baton: #path::serde::Baton,
+            ) -> #path::serde::Result<()> {
+                serializer.enum_variant(self, baton)
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn #path::serde::de::DynDeserializer,
+                baton: #path::serde::Baton,
+            ) -> #path::serde::Result<()> {
+                deserializer.enum_variant(self, baton)
+            }
         }
 
         impl #impl_generics #enum_trait for #ty #ty_generics #where_clause {
@@ -293,6 +325,18 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
                 }
             }
 
+            fn update_variant(
+                &mut self,
+                variant: &::std::primitive::str,
+            ) -> ::std::primitive::bool {
+                if let ::std::option::Option::Some(value) = Self::from_variant(variant) {
+                    *self = value;
+                    true
+                } else {
+                    false
+                }
+            }
+
             fn from_variant(variant: &::std::primitive::str) -> ::std::option::Option<Self>
             where
                 Self: ::std::marker::Sized
@@ -306,6 +350,18 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
             fn value(&self) -> ::std::primitive::u32 {
                 match self {
                     #(#ty::#idents => #discrims,)*
+                }
+            }
+
+            fn update_value(
+                &mut self,
+                value: ::std::primitive::u32,
+            ) -> ::std::primitive::bool {
+                if let ::std::option::Option::Some(value) = Self::from_value(value) {
+                    *self = value;
+                    true
+                } else {
+                    false
                 }
             }
 

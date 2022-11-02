@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use super::{result::*, Baton};
-use crate::{type_info::PropertyList, Container, Enum, PropertyClass};
+use crate::{type_info::PropertyList, Enum, PropertyClass, Type};
 
 mod sealed {
     pub trait Sealed {}
@@ -83,12 +83,18 @@ pub trait Layout {
 
     /// Deserializes a [`Container`] object in-place from the
     /// described format.
+    ///
+    /// The provided `f` should use [`ContainerVisitor`]
+    /// to dynamically deserialize concrete,
+    /// default-initialized values and push them into
+    /// a suitable container type.
     fn container(
-        &mut self,
-        m: &mut dyn Unmarshal,
-        v: &mut dyn Container,
+        deserializer: &mut dyn DynDeserializer,
+        f: &mut dyn FnMut(&mut dyn ContainerVisitor, Baton) -> Result<()>,
         baton: Baton,
-    ) -> Result<()>;
+    ) -> Result<()>
+    where
+        Self: Sized;
 
     /// Deserializes an [`Enum`] variant from the described
     /// format in-place.
@@ -124,13 +130,39 @@ pub trait DynDeserializer: sealed::Sealed {
     /// is responsible for that.
     fn class(&mut self, v: &mut dyn PropertyClass, baton: Baton) -> Result<()>;
 
-    /// Deserializes a [`Container`] object in-place from the
-    /// described format.
-    fn container(&mut self, v: &mut dyn Container, baton: Baton) -> Result<()>;
+    /// Deserializes a [`Container`] object from the
+    /// described format in-place.
+    ///
+    /// The provided `f` should use [`ContainerVisitor`]
+    /// to dynamically deserialize concrete,
+    /// default-initialized values and push them into
+    /// a suitable container type.
+    fn container(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn ContainerVisitor, Baton) -> Result<()>,
+        baton: Baton,
+    ) -> Result<()>;
 
     /// Deserializes an [`Enum`] variant from the described
     /// format in-place.
     fn enum_variant(&mut self, v: &mut dyn Enum, baton: Baton) -> Result<()>;
+}
+
+/// A visitor for dynamically deserializing [`Container`]s.
+///
+/// Implementations should cache their [`DynDeserializer`]
+/// at construction and use it for the implementation of the
+/// [`ContainerVisitor::next`] method.
+pub trait ContainerVisitor {
+    /// The number of available elements to read, if known.
+    fn element_count(&self) -> Option<usize>;
+
+    /// Deserializes the next element in-place from the
+    /// container sequence.
+    ///
+    /// The returned [`bool`] indicates if there are more
+    /// elements to read.
+    fn next(&mut self, value: &mut dyn Type, baton: Baton) -> Result<bool>;
 }
 
 /// An extension trait for adding custom pre and post
@@ -229,8 +261,12 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> DynDeserializer for Deserial
         self.layout.class(&mut self.unmarshal, v, baton)
     }
 
-    fn container(&mut self, v: &mut dyn Container, baton: Baton) -> Result<()> {
-        self.layout.container(&mut self.unmarshal, v, baton)
+    fn container(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn ContainerVisitor, Baton) -> Result<()>,
+        baton: Baton,
+    ) -> Result<()> {
+        L::container(self, f, baton)
     }
 
     fn enum_variant(&mut self, v: &mut dyn Enum, baton: Baton) -> Result<()> {

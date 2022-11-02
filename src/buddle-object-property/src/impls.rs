@@ -1,9 +1,7 @@
-use std::{
-    collections::VecDeque,
-    num::{NonZeroI16, NonZeroI32, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8},
-};
+use std::collections::VecDeque;
 
 use crate::{
+    serde::{self, de::DynDeserializer, ser::DynSerializer, Baton},
     type_info::{Reflected, TypeInfo},
     Container, ContainerIter, Type,
 };
@@ -34,72 +32,83 @@ macro_rules! impl_leaf_info_for {
     };
 }
 
-/// Implements the [`Type`][crate::Type] trait for custom
-/// types.
-///
-/// # Safety
-///
-/// `kind` may be any of the [`TypeRef`][crate::TypeRef]
-/// variants which will be used in place.
+/// Implements most of the [`Type`][crate::Type] methods
+/// in-place.
 ///
 /// # Example
 ///
 /// ```
-/// # use buddle_object_property::{impl_leaf_info_for, impl_type_for, Type};
+/// # use buddle_object_property::{impl_leaf_info_for, impl_type_methods, Type};
 /// struct Example;
+///
+/// impl Type for Example {
+///     impl_type_methods!(Value);
+/// }
 /// impl_leaf_info_for!(Example);
-/// impl_type_for!(Value: <> Type for Example);
 /// ```
 #[macro_export]
-macro_rules! impl_type_for {
-    ($kind:ident: $($desc:tt)*) => {
-        impl $($desc)* {
-            #[inline]
-            fn as_any(&self) -> &dyn ::std::any::Any {
-                self
-            }
+macro_rules! impl_type_methods {
+    ($kind:ident) => {
+        #[inline]
+        fn as_any(&self) -> &dyn ::std::any::Any {
+            self
+        }
 
-            #[inline]
-            fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any {
-                self
-            }
+        #[inline]
+        fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any {
+            self
+        }
 
-            #[inline]
-            fn as_type(&self) -> &dyn $crate::Type {
-                self
-            }
+        #[inline]
+        fn as_type(&self) -> &dyn $crate::Type {
+            self
+        }
 
-            #[inline]
-            fn as_type_mut(&mut self) -> &mut dyn $crate::Type {
-                self
-            }
+        #[inline]
+        fn as_type_mut(&mut self) -> &mut dyn $crate::Type {
+            self
+        }
 
-            #[inline]
-            fn type_ref(&self) -> $crate::TypeRef<'_> {
-                $crate::TypeRef::$kind(self)
-            }
+        #[inline]
+        fn type_ref(&self) -> $crate::TypeRef<'_> {
+            $crate::TypeRef::$kind(self)
+        }
 
-            #[inline]
-            fn type_mut(&mut self) -> $crate::TypeMut<'_> {
-                $crate::TypeMut::$kind(self)
-            }
+        #[inline]
+        fn type_mut(&mut self) -> $crate::TypeMut<'_> {
+            $crate::TypeMut::$kind(self)
+        }
 
-            #[inline]
-            fn set(
-                &mut self,
-                value: ::std::boxed::Box<dyn $crate::Type>,
-            ) -> ::std::result::Result<(), ::std::boxed::Box<dyn $crate::Type>> {
-                *self = *value.downcast()?;
-                ::std::result::Result::Ok(())
-            }
+        #[inline]
+        fn set(
+            &mut self,
+            value: ::std::boxed::Box<dyn $crate::Type>,
+        ) -> ::std::result::Result<(), ::std::boxed::Box<dyn $crate::Type>> {
+            *self = *value.downcast()?;
+            ::std::result::Result::Ok(())
         }
     };
 }
 
 macro_rules! impl_primitive {
-    ($ty:ty, $name:expr) => {
+    ($ty:ident, $name:expr) => {
         impl_leaf_info_for!($ty, $name);
-        impl_type_for!(Value: <> $crate::Type for $ty);
+        impl Type for $ty {
+            impl_type_methods!(Value);
+
+            fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
+                serializer.marshal().$ty(*self)
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn DynDeserializer,
+                _: Baton,
+            ) -> serde::Result<()> {
+                *self = deserializer.unmarshal().$ty()?;
+                Ok(())
+            }
+        }
     };
 }
 
@@ -109,33 +118,65 @@ impl_primitive!(i8, "char");
 impl_primitive!(i16, "short");
 impl_primitive!(i32, "int");
 
-impl_primitive!(NonZeroI8, "char");
-impl_primitive!(NonZeroI16, "short");
-impl_primitive!(NonZeroI32, "int");
-
 impl_primitive!(u8, "unsigned char");
 impl_primitive!(u16, "unsigned short");
 impl_primitive!(u32, "unsigned int");
 impl_primitive!(u64, "unsigned __int64");
-
-impl_primitive!(NonZeroU8, "unsigned char");
-impl_primitive!(NonZeroU16, "unsigned short");
-impl_primitive!(NonZeroU32, "unsigned int");
-impl_primitive!(NonZeroU64, "unsigned __int64");
 
 impl_primitive!(f32, "float");
 impl_primitive!(f64, "double");
 
 macro_rules! impl_container {
     ($ty:path, $deref:ty, $push:ident, $pop:ident) => {
-        unsafe impl<T: Reflected + Type> Reflected for $ty {
+        unsafe impl<T: Default + Reflected + Type> Reflected for $ty {
             const TYPE_INFO: &'static TypeInfo =
                 &TypeInfo::leaf::<$ty>(Some(<T as Reflected>::TYPE_INFO.type_name()));
         }
 
-        impl_type_for!(Container: <T: Reflected + Type> Type for $ty);
+        impl<T: Default + Reflected + Type> Type for $ty {
+            impl_type_methods!(Container);
 
-        impl<T: Reflected + Type> Container for $ty {
+            fn serialize(
+                &self,
+                serializer: &mut dyn DynSerializer,
+                baton: Baton,
+            ) -> serde::Result<()> {
+                // Serialize the entire container.
+                serializer.container(self, baton)
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn DynDeserializer,
+                baton: Baton,
+            ) -> serde::Result<()> {
+                // We want to get rid of all the elements to avoid mixup
+                // between what was serialized and what was already there.
+                self.clear();
+
+                // Deserialize the entire container.
+                deserializer.container(
+                    &mut |visitor, baton| {
+                        let len = visitor.element_count().unwrap_or(0);
+
+                        // Reserve sufficient space for the elements in advance.
+                        self.reserve(len);
+
+                        // Deserialize every individual element.
+                        for _ in 0..len {
+                            let mut element = T::default();
+                            visitor.next(&mut element, baton)?;
+                            <$ty>::$push(self, element);
+                        }
+
+                        Ok(())
+                    },
+                    baton,
+                )
+            }
+        }
+
+        impl<T: Default + Reflected + Type> Container for $ty {
             fn get(&self, idx: usize) -> Option<&dyn Type> {
                 <$deref>::get(self, idx).map(|e| e as &dyn Type)
             }
@@ -148,7 +189,10 @@ macro_rules! impl_container {
                 <$ty>::$push(
                     self,
                     *value.downcast().unwrap_or_else(|v| {
-                        panic!("Attempted to push invalid value of type {}!", v.type_info().type_name())
+                        panic!(
+                            "Attempted to push invalid value of type {}!",
+                            v.type_info().type_name()
+                        )
                     }),
                 )
             }

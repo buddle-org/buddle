@@ -8,6 +8,14 @@ pub trait Enum: Type {
     /// Gets the name of this variant as a string.
     fn variant(&self) -> &'static str;
 
+    /// Updates the value of `self` to the new variant
+    /// given as a string.
+    ///
+    /// A [`bool`] indicates whether a variant matching
+    /// the string exists. If this returns `false`, self
+    /// was not modified.
+    fn update_variant(&mut self, variant: &str) -> bool;
+
     /// Gets a variant from its string representation.
     ///
     /// Returns [`None`] if `variant` does not map to
@@ -18,6 +26,14 @@ pub trait Enum: Type {
 
     /// Gets the value of this variant.
     fn value(&self) -> u32;
+
+    /// Updates the value of `self` to the new variant
+    /// given as a an integer.
+    ///
+    /// A [`bool`] indicates whether a variant matching
+    /// the string exists. If this returns `false`, self
+    /// was not modified.
+    fn update_value(&mut self, value: u32) -> bool;
 
     /// Gets a variant from its numeric representation.
     ///

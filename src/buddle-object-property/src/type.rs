@@ -80,7 +80,7 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
     /// Types that do not support serialization do not
     /// have to override this method.
     #[allow(unused_variables)]
-    fn serialize(&mut self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
+    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
         Err(serde::Error::custom(
             "this type does not support serialization",
         ))

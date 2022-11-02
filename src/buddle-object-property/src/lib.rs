@@ -7,6 +7,7 @@
 //! [Richard Lyle]: https://github.com/rlyle
 //! [Medusa]: https://github.com/palestar/medusa
 
+#![allow(incomplete_features)]
 #![deny(
     rust_2018_idioms,
     rustdoc::broken_intra_doc_links,
@@ -17,6 +18,9 @@
     const_option_ext,
     const_type_id,
     const_type_name,
+
+    // Construction of composed type names at compile-time.
+    generic_const_exprs,
 
     // Enables reflected access to `dyn Type` properties.
     pointer_byte_offsets,

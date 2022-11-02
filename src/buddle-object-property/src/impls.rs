@@ -259,3 +259,95 @@ macro_rules! impl_container {
 
 impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
+
+// One day this will be a lot nicer than it currently is.
+// But this day is far, far away and until then...
+mod const_hax {
+    use std::{marker::PhantomData, str::from_utf8_unchecked};
+
+    use crate::type_info::Reflected;
+
+    const fn concater<const N: usize>(strs: &[&str]) -> [u8; N] {
+        let mut i = 0;
+        let mut out = [0u8; N];
+        let mut out_i = 0;
+
+        while i < strs.len() {
+            let bytes = strs[i].as_bytes();
+            let mut j = 0;
+
+            while j < bytes.len() {
+                out[out_i] = bytes[j];
+                out_i += 1;
+                j += 1;
+            }
+
+            i += 1;
+        }
+
+        out
+    }
+
+    struct NameWrapper<T> {
+        _t: PhantomData<T>,
+    }
+
+    impl<T: Reflected> NameWrapper<T> {
+        pub const NAME: &str = T::TYPE_INFO.type_name();
+        pub const NAME_LEN: usize = Self::NAME.len();
+        pub const PTR_NAME_LEN: usize = Self::NAME_LEN + 1; // "*"
+        pub const SHARED_PTR_NAME_LEN: usize = Self::NAME_LEN + 17; // "class SharedPtr<>"
+        pub const WEAK_PTR_NAME_LEN: usize = Self::NAME_LEN + 15; // "class WeakPtr<>"
+    }
+
+    struct PtrNameWrapper<T> {
+        _t: PhantomData<T>,
+    }
+
+    impl<T: Reflected> PtrNameWrapper<NameWrapper<T>>
+    where
+        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
+    {
+        pub const PTR_NAME_DATA: &[u8; NameWrapper::<T>::PTR_NAME_LEN] =
+            &concater(&[NameWrapper::<T>::NAME, "*"]);
+
+        pub const SHARED_PTR_NAME_DATA: &[u8; NameWrapper::<T>::SHARED_PTR_NAME_LEN] =
+            &concater(&["class SharedPtr<", NameWrapper::<T>::NAME, ">"]);
+
+        pub const WEAK_PTR_NAME_DATA: &[u8; NameWrapper::<T>::WEAK_PTR_NAME_LEN] =
+            &concater(&["class WeakPtr<", NameWrapper::<T>::NAME, ">"]);
+    }
+
+    // SAFETY: The type names from `Reflected` are originally
+    // already &strs. And since we only concat these with
+    // more literal &strs, we have valid UTF-8 as-is.
+
+    pub const fn ptr_name_for<T: Reflected>() -> &'static str
+    where
+        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
+    {
+        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::PTR_NAME_DATA) }
+    }
+
+    pub const fn shared_ptr_name_for<T: Reflected>() -> &'static str
+    where
+        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
+    {
+        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::SHARED_PTR_NAME_DATA) }
+    }
+
+    pub const fn weak_ptr_name_for<T: Reflected>() -> &'static str
+    where
+        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
+        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
+    {
+        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::WEAK_PTR_NAME_DATA) }
+    }
+}

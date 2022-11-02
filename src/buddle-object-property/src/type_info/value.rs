@@ -11,9 +11,9 @@ use crate::Type;
 /// [`TypeInfo`]: super::TypeInfo
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ValueInfo {
-    type_name: &'static str,
-    type_hash: u32,
-    type_id: TypeId,
+    pub(crate) type_name: &'static str,
+    pub(crate) type_hash: u32,
+    pub(crate) type_id: TypeId,
 }
 
 impl ValueInfo {

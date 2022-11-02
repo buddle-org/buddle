@@ -3,3 +3,6 @@
 
 mod ptr;
 pub use self::ptr::*;
+
+mod strings;
+pub use self::strings::*;

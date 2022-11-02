@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::{
+    cpp::*,
     serde::{self, de::DynDeserializer, ser::DynSerializer, Baton},
     type_info::{Reflected, TypeInfo},
     Container, ContainerIter, Type,
@@ -125,6 +126,42 @@ impl_primitive!(u64, "unsigned __int64");
 
 impl_primitive!(f32, "float");
 impl_primitive!(f64, "double");
+
+impl_leaf_info_for!(RawString, "std::string");
+impl Type for RawString {
+    impl_type_methods!(Value);
+
+    fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
+        serializer.marshal().str(&self.0)
+    }
+
+    fn deserialize(
+        &mut self,
+        deserializer: &mut dyn DynDeserializer,
+        _: Baton,
+    ) -> serde::Result<()> {
+        *self = deserializer.unmarshal().str().map(Self)?;
+        Ok(())
+    }
+}
+
+impl_leaf_info_for!(RawWideString, "std::wstring");
+impl Type for RawWideString {
+    impl_type_methods!(Value);
+
+    fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
+        serializer.marshal().wstr(&self.0)
+    }
+
+    fn deserialize(
+        &mut self,
+        deserializer: &mut dyn DynDeserializer,
+        _: Baton,
+    ) -> serde::Result<()> {
+        *self = deserializer.unmarshal().wstr().map(Self)?;
+        Ok(())
+    }
+}
 
 macro_rules! impl_container {
     ($ty:path, $deref:ty, $push:ident, $pop:ident) => {

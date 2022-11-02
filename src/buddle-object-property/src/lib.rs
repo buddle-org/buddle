@@ -32,6 +32,8 @@ pub use buddle_object_property_macros::*;
 mod container;
 pub use self::container::*;
 
+pub mod cpp;
+
 mod r#enum;
 pub use self::r#enum::*;
 

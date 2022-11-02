@@ -65,7 +65,11 @@ pub trait Layout {
     /// The identity is a per-class unique piece of
     /// information the deserializer can use to dynamically
     /// identify the serialized object's type.
-    fn identity(&mut self, m: &mut dyn Unmarshal, baton: Baton) -> Result<&'static PropertyList>;
+    fn identity(
+        &mut self,
+        m: &mut dyn Unmarshal,
+        baton: Baton,
+    ) -> Result<Option<&'static PropertyList>>;
 
     /// Deserializes a [`PropertyClass`] object from the
     /// described format in-place.
@@ -119,7 +123,7 @@ pub trait DynDeserializer: sealed::Sealed {
     /// The identity is a per-class unique piece of
     /// information the deserializer can use to dynamically
     /// identify the serialized object's type.
-    fn identity(&mut self, baton: Baton) -> Result<&'static PropertyList>;
+    fn identity(&mut self, baton: Baton) -> Result<Option<&'static PropertyList>>;
 
     /// Deserializes a [`PropertyClass`] object from the
     /// described format in-place.
@@ -215,17 +219,20 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> Deserializer<M, L, Ext> {
 
         Ext::pre(&mut self)?;
 
-        let identity = self.layout.identity(&mut self.unmarshal, baton)?;
-        let mut object = identity.make_default();
+        if let Some(identity) = self.layout.identity(&mut self.unmarshal, baton)? {
+            let mut object = identity.make_default();
 
-        object.on_pre_load();
-        self.layout
-            .class(&mut self.unmarshal, &mut *object, baton)?;
-        object.on_post_load();
+            object.on_pre_load();
+            self.layout
+                .class(&mut self.unmarshal, &mut *object, baton)?;
+            object.on_post_load();
 
-        Ext::post(self)?;
+            Ext::post(self)?;
 
-        Ok(object)
+            Ok(object)
+        } else {
+            Err(Error::custom("Empty root object serialized"))
+        }
     }
 
     /// Deserializes in-place to the given `obj`.
@@ -253,7 +260,7 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> DynDeserializer for Deserial
         self.unmarshal.human_readable()
     }
 
-    fn identity(&mut self, baton: Baton) -> Result<&'static PropertyList> {
+    fn identity(&mut self, baton: Baton) -> Result<Option<&'static PropertyList>> {
         self.layout.identity(&mut self.unmarshal, baton)
     }
 

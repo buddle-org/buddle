@@ -51,12 +51,14 @@ pub fn deserialize_class<T: PropertyClass>(
     baton: Baton,
 ) -> Result<()> {
     let list = deserializer.identity(baton)?;
-    if list.is::<T>() {
+    let list = list.as_ref();
+
+    if list.map(|l| l.is::<T>()).unwrap_or(false) {
         deserializer.class(v, baton)
     } else {
         Err(Error::custom(format_args!(
             "Type mismatch - {} serialized, {} instantiated",
-            list.type_name(),
+            list.map(|l| l.type_name()).unwrap_or("nothing"),
             v.type_info().type_name()
         )))
     }

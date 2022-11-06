@@ -162,6 +162,11 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
             }
 
             #[inline]
+            fn as_boxed_type(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn #path::Type> {
+                self
+            }
+
+            #[inline]
             fn type_ref(&self) -> #path::TypeRef<'_> {
                 #path::TypeRef::Class(self)
             }
@@ -169,6 +174,11 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
             #[inline]
             fn type_mut(&mut self) -> #path::TypeMut<'_> {
                 #path::TypeMut::Class(self)
+            }
+
+            #[inline]
+            fn type_owned(self: ::std::boxed::Box<Self>) -> #path::TypeOwned {
+                #path::TypeOwned::Class(self)
             }
 
             #[inline]
@@ -203,6 +213,16 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
                 Self: ::std::marker::Sized,
             {
                 <::std::boxed::Box::<Self> as ::std::default::Default>::default()
+            }
+
+            fn base(&self) -> ::std::option::Option<&dyn #path::PropertyClass> {
+                let list = self.property_list();
+                list.base_value(self)
+            }
+
+            fn base_mut(&mut self) -> ::std::option::Option<&mut dyn #path::PropertyClass> {
+                let list = self.property_list();
+                list.base_value_mut(self)
             }
 
             fn on_pre_save(&mut self) {
@@ -271,6 +291,11 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
             }
 
             #[inline]
+            fn as_boxed_type(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn #path::Type> {
+                self
+            }
+
+            #[inline]
             fn type_ref(&self) -> #path::TypeRef<'_> {
                 #path::TypeRef::Enum(self)
             }
@@ -278,6 +303,11 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
             #[inline]
             fn type_mut(&mut self) -> #path::TypeMut<'_> {
                 #path::TypeMut::Enum(self)
+            }
+
+            #[inline]
+            fn type_owned(self: ::std::boxed::Box<Self>) -> #path::TypeOwned {
+                #path::TypeOwned::Enum(self)
             }
 
             #[inline]

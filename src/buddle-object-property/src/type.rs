@@ -32,6 +32,30 @@ pub enum TypeMut<'ty> {
     Value(&'ty mut dyn Type),
 }
 
+/// An owned value categorized by varying data types.
+pub enum TypeOwned {
+    /// A property class object.
+    Class(Box<dyn PropertyClass>),
+    /// A container object.
+    Container(Box<dyn Container>),
+    /// An enum object.
+    Enum(Box<dyn Enum>),
+    /// A regular value object.
+    Value(Box<dyn Type>),
+}
+
+impl TypeOwned {
+    ///
+    pub fn into_type(self) -> Box<dyn Type> {
+        match self {
+            Self::Class(value) => value,
+            Self::Container(value) => value,
+            Self::Enum(value) => value,
+            Self::Value(value) => value,
+        }
+    }
+}
+
 /// A reflected Rust type in the *ObjectProperty* system.
 ///
 /// # Correctness
@@ -62,11 +86,17 @@ pub trait Type: Any + Sync + Send + DynReflected + 'static {
     /// Gets the value as a [`Type`] reference.
     fn as_type_mut(&mut self) -> &mut dyn Type;
 
+    /// Gets the value as a boxed [`Type`] object.
+    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type>;
+
     /// Gets `self` as a [`TypeRef`].
     fn type_ref(&self) -> TypeRef<'_>;
 
     /// Gets `self` as a [`TypeMut`].
     fn type_mut(&mut self) -> TypeMut<'_>;
+
+    /// Gets `self` as a [`TypeOwned`].
+    fn type_owned(self: Box<Self>) -> TypeOwned;
 
     /// Attempts to perform a type-checked assignment of
     /// `value` to `self`.

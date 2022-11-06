@@ -155,6 +155,8 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "buddle-object-property-macros",
+ "once_cell",
+ "usync",
 ]
 
 [[package]]
@@ -1399,6 +1401,15 @@ name = "unicode-xid"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
+
+[[package]]
+name = "usync"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08c3b63e6a3d2b1aa756b189bd0cc072f3baf368a5667e17482c2c81dafe00e0"
+dependencies = [
+ "lock_api",
+]
 
 [[package]]
 name = "vec_map"

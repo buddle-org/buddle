@@ -19,15 +19,15 @@
     const_type_id,
     const_type_name,
 
-    // Construction of composed type names at compile-time.
-    generic_const_exprs,
+    // Better macro ergonomics.
+    decl_macro,
 
     // Enables reflected access to `dyn Type` properties.
     pointer_byte_offsets,
     ptr_metadata,
 
-    // Better macro ergonomics.
-    decl_macro
+    // Coercion of `dyn PropertyClass` to `dyn Type`.
+    trait_upcasting
 )]
 
 #[doc(inline)]

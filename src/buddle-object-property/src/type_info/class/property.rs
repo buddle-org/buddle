@@ -47,7 +47,7 @@ bitflags! {
 /// - [`TypeInfo`] for their storage type
 ///
 /// - an individual set of [`PropertyFlags`]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Property {
     name: &'static str,
     hash: u32,

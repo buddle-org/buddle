@@ -35,7 +35,7 @@ pub fn serialize_class<T: PropertyClass>(
     v: &T,
     baton: Baton,
 ) -> Result<()> {
-    serializer.identity(v.property_list(), baton)?;
+    serializer.identity(Some(v.property_list()), baton)?;
     serializer.class(v, baton)
 }
 

@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
+use std::{any::TypeId, collections::VecDeque};
 
 use crate::{
     cpp::*,
     serde::{self, de::DynDeserializer, ser::DynSerializer, Baton},
-    type_info::{Reflected, TypeInfo},
-    Container, ContainerIter, Type,
+    type_info::*,
+    Container, ContainerIter, PropertyClass, PropertyClassExt, Type, TypeMut, TypeOwned, TypeRef,
 };
 
 /// Implements the [`Reflected`][crate::type_info::Reflected]
@@ -71,6 +71,11 @@ macro_rules! impl_type_methods {
         }
 
         #[inline]
+        fn as_boxed_type(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn $crate::Type> {
+            self
+        }
+
+        #[inline]
         fn type_ref(&self) -> $crate::TypeRef<'_> {
             $crate::TypeRef::$kind(self)
         }
@@ -78,6 +83,11 @@ macro_rules! impl_type_methods {
         #[inline]
         fn type_mut(&mut self) -> $crate::TypeMut<'_> {
             $crate::TypeMut::$kind(self)
+        }
+
+        #[inline]
+        fn type_owned(self: ::std::boxed::Box<Self>) -> $crate::TypeOwned {
+            $crate::TypeOwned::$kind(self)
         }
 
         #[inline]
@@ -260,94 +270,200 @@ macro_rules! impl_container {
 impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
 
-// One day this will be a lot nicer than it currently is.
-// But this day is far, far away and until then...
-mod const_hax {
-    use std::{marker::PhantomData, str::from_utf8_unchecked};
+// SAFETY: `T`'s type info must meet the invariants.
+unsafe impl<T: Reflected + PropertyClass> DynReflected for Ptr<T> {
+    fn type_info(&self) -> &'static TypeInfo {
+        static TYPE_INFO: GenericTypeInfoCell = GenericTypeInfoCell::new();
 
-    use crate::type_info::Reflected;
+        // A dummy type with a unique ID for referring to
+        // placeholder type info when the pointer is null.
+        struct Empty;
 
-    const fn concater<const N: usize>(strs: &[&str]) -> [u8; N] {
-        let mut i = 0;
-        let mut out = [0u8; N];
-        let mut out_i = 0;
+        match &self.value {
+            Some(value) => TYPE_INFO.get_or_insert::<T, _>(|| {
+                let name = T::TYPE_INFO.type_name();
+                // SAFETY: Correct PropertyList provided for pointed-to type.
+                TypeInfo::Class(unsafe {
+                    PropertyList::new_ptr::<Self>(name, value.property_list(), "", "*")
+                })
+            }),
 
-        while i < strs.len() {
-            let bytes = strs[i].as_bytes();
-            let mut j = 0;
+            None => TYPE_INFO.get_or_insert::<Empty, _>(|| {
+                let name = T::TYPE_INFO.type_name();
+                // SAFETY: No harm can be done with an empty PropertyList.
+                TypeInfo::Class(unsafe { PropertyList::new::<Self>(Some(name), None, &[]) })
+            }),
+        }
+    }
+}
 
-            while j < bytes.len() {
-                out[out_i] = bytes[j];
-                out_i += 1;
-                j += 1;
+impl<T: Reflected + PropertyClass> Type for Ptr<T> {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn as_type(&self) -> &dyn Type {
+        self
+    }
+
+    fn as_type_mut(&mut self) -> &mut dyn Type {
+        self
+    }
+
+    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+        self
+    }
+
+    fn type_ref(&self) -> TypeRef<'_> {
+        TypeRef::Class(self)
+    }
+
+    fn type_mut(&mut self) -> TypeMut<'_> {
+        TypeMut::Class(self)
+    }
+
+    fn type_owned(self: ::std::boxed::Box<Self>) -> TypeOwned {
+        TypeOwned::Class(self)
+    }
+
+    fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
+        match value.downcast::<Self>() {
+            Ok(value) => {
+                *self = *value;
+                Ok(())
             }
+            Err(value) => match value.type_owned() {
+                TypeOwned::Class(c) if c.base_as::<T>().is_some() => {
+                    self.value = Some(c);
+                    Ok(())
+                }
+                x => Err(x.into_type()),
+            },
+        }
+    }
 
-            i += 1;
+    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
+        // First, serialize the identity of the object we have one.
+        let identity = self.value.as_ref().map(|v| v.property_list());
+        serializer.identity(identity, baton)?;
+
+        // When a value is also present, serialize it.
+        if let Some(value) = self.value.as_deref() {
+            serializer.class(value, baton)?;
         }
 
-        out
+        Ok(())
     }
 
-    struct NameWrapper<T> {
-        _t: PhantomData<T>,
-    }
+    fn deserialize(
+        &mut self,
+        deserializer: &mut dyn DynDeserializer,
+        baton: Baton,
+    ) -> serde::Result<()> {
+        if let Some(identity) = deserializer.identity(baton)? {
+            // Create the default instance of the type we're expecting.
+            if let Err(e) = self.as_type_mut().set(identity.make_default()) {
+                return Err(serde::Error::custom(format_args!(
+                    "Failed to deserialize incompatible pointer type {}",
+                    e.type_info().type_name()
+                )));
+            }
 
-    impl<T: Reflected> NameWrapper<T> {
-        pub const NAME: &str = T::TYPE_INFO.type_name();
-        pub const NAME_LEN: usize = Self::NAME.len();
-        pub const PTR_NAME_LEN: usize = Self::NAME_LEN + 1; // "*"
-        pub const SHARED_PTR_NAME_LEN: usize = Self::NAME_LEN + 17; // "class SharedPtr<>"
-        pub const WEAK_PTR_NAME_LEN: usize = Self::NAME_LEN + 15; // "class WeakPtr<>"
-    }
+            // Deserialize the pointed-to value.
+            deserializer.class(self.value.as_deref_mut().unwrap(), baton)?;
+        } else {
+            self.value = None;
+        }
 
-    struct PtrNameWrapper<T> {
-        _t: PhantomData<T>,
+        Ok(())
     }
+}
 
-    impl<T: Reflected> PtrNameWrapper<NameWrapper<T>>
+impl<T: Reflected + PropertyClass> PropertyClass for Ptr<T> {
+    fn make_default() -> Box<dyn PropertyClass>
     where
-        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
+        Self: Sized,
     {
-        pub const PTR_NAME_DATA: &[u8; NameWrapper::<T>::PTR_NAME_LEN] =
-            &concater(&[NameWrapper::<T>::NAME, "*"]);
-
-        pub const SHARED_PTR_NAME_DATA: &[u8; NameWrapper::<T>::SHARED_PTR_NAME_LEN] =
-            &concater(&["class SharedPtr<", NameWrapper::<T>::NAME, ">"]);
-
-        pub const WEAK_PTR_NAME_DATA: &[u8; NameWrapper::<T>::WEAK_PTR_NAME_LEN] =
-            &concater(&["class WeakPtr<", NameWrapper::<T>::NAME, ">"]);
+        Box::<Self>::default()
     }
 
-    // SAFETY: The type names from `Reflected` are originally
-    // already &strs. And since we only concat these with
-    // more literal &strs, we have valid UTF-8 as-is.
+    fn property(&self, view: PropertyAccess<'_>) -> Option<&dyn Type> {
+        match &self.value {
+            Some(value) => view.value(TypeId::of::<Self>()).map(|property| {
+                let ptr = &**value as *const dyn PropertyClass;
 
-    pub const fn ptr_name_for<T: Reflected>() -> &'static str
-    where
-        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
-    {
-        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::PTR_NAME_DATA) }
+                // SAFETY: We're coming from a reference, so the
+                // pointer is valid. The inferred lifetime will
+                // be that of `self`.
+                //
+                // Since the properties in a list for this type
+                // are copied over from `value`'s list, this is
+                // a safe way of accessing them.
+                unsafe { property.value(ptr.cast()) }
+            }),
+
+            None => None,
+        }
     }
 
-    pub const fn shared_ptr_name_for<T: Reflected>() -> &'static str
-    where
-        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
-    {
-        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::SHARED_PTR_NAME_DATA) }
+    fn property_mut(&mut self, view: PropertyAccess<'_>) -> Option<&mut dyn Type> {
+        match &mut self.value {
+            Some(value) => view.value(TypeId::of::<Self>()).map(|property| {
+                let ptr = &mut **value as *mut dyn PropertyClass;
+
+                // SAFETY: We're coming from a reference, so the
+                // pointer is valid. The inferred lifetime will
+                // be that of `self`.
+                //
+                // Since the properties in a list for this type
+                // are copied over from `value`'s list, this is
+                // a safe way of accessing them.
+                unsafe { property.value_mut(ptr.cast()) }
+            }),
+
+            None => None,
+        }
     }
 
-    pub const fn weak_ptr_name_for<T: Reflected>() -> &'static str
-    where
-        [(); NameWrapper::<T>::PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::SHARED_PTR_NAME_LEN]: Sized,
-        [(); NameWrapper::<T>::WEAK_PTR_NAME_LEN]: Sized,
-    {
-        unsafe { from_utf8_unchecked(PtrNameWrapper::<NameWrapper<T>>::WEAK_PTR_NAME_DATA) }
+    fn base(&self) -> ::std::option::Option<&dyn PropertyClass> {
+        let list = self.property_list();
+        self.value
+            .as_deref()
+            .and_then(|value| list.base_value(value))
+    }
+
+    fn base_mut(&mut self) -> ::std::option::Option<&mut dyn PropertyClass> {
+        let list = self.property_list();
+        self.value
+            .as_deref_mut()
+            .and_then(|value| list.base_value_mut(value))
+    }
+
+    fn on_pre_save(&mut self) {
+        if let Some(value) = &mut self.value {
+            value.on_pre_save();
+        }
+    }
+
+    fn on_post_save(&mut self) {
+        if let Some(value) = &mut self.value {
+            value.on_post_save();
+        }
+    }
+
+    fn on_pre_load(&mut self) {
+        if let Some(value) = &mut self.value {
+            value.on_pre_load();
+        }
+    }
+
+    fn on_post_load(&mut self) {
+        if let Some(value) = &mut self.value {
+            value.on_post_load();
+        }
     }
 }

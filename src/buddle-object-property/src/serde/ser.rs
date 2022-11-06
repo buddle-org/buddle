@@ -68,7 +68,7 @@ pub trait Layout {
     fn identity(
         &mut self,
         m: &mut dyn Marshal,
-        v: &'static PropertyList,
+        v: Option<&'static PropertyList>,
         baton: Baton,
     ) -> Result<()>;
 
@@ -107,7 +107,7 @@ pub trait DynSerializer: sealed::Sealed {
     /// The identity is a per-class unique piece of
     /// information the deserializer can use to dynamically
     /// identify the serialized object's type.
-    fn identity(&mut self, v: &'static PropertyList, baton: Baton) -> Result<()>;
+    fn identity(&mut self, v: Option<&'static PropertyList>, baton: Baton) -> Result<()>;
 
     /// Serializes a [`PropertyClass`] object into the
     /// described format.
@@ -176,7 +176,8 @@ impl<M: Marshal, L: Layout, Ext: SerializerExt> Serializer<M, L, Ext> {
         Ext::pre(&mut self)?;
 
         obj.on_pre_load();
-        self.layout.identity(&mut self.marshal, obj.property_list(), baton)?;
+        self.layout
+            .identity(&mut self.marshal, Some(obj.property_list()), baton)?;
         self.layout.class(&mut self.marshal, obj, baton)?;
         obj.on_post_load();
 
@@ -195,7 +196,7 @@ impl<M: Marshal, L: Layout, Ext: SerializerExt> DynSerializer for Serializer<M, 
         self.marshal.human_readable()
     }
 
-    fn identity(&mut self, v: &'static PropertyList, baton: Baton) -> Result<()> {
+    fn identity(&mut self, v: Option<&'static PropertyList>, baton: Baton) -> Result<()> {
         self.layout.identity(&mut self.marshal, v, baton)
     }
 

@@ -35,6 +35,11 @@ macro_rules! impl_ptr {
             pub const fn is_null(&self) -> bool {
                 self.value.is_none()
             }
+
+            /// Gets the raw value of the stored object.
+            pub fn get_raw(&self) -> Option<&dyn PropertyClass> {
+                self.value.as_deref()
+            }
         }
 
         impl<T: PropertyClass> Default for $ty {
@@ -51,7 +56,7 @@ macro_rules! impl_ptr {
 /// where `T` is a base of the actual stored type.
 #[repr(transparent)]
 pub struct Ptr<T: PropertyClass> {
-    value: Option<Box<dyn PropertyClass>>,
+    pub(crate) value: Option<Box<dyn PropertyClass>>,
     _t: PhantomData<T>,
 }
 
@@ -93,7 +98,7 @@ impl_ptr!(Ptr<T>, Box<T>);
 /// where `T` is a base of the actual stored type.
 #[repr(transparent)]
 pub struct SharedPtr<T: PropertyClass> {
-    value: Option<Arc<dyn PropertyClass>>,
+    pub(crate) value: Option<Arc<dyn PropertyClass>>,
     _t: PhantomData<T>,
 }
 
@@ -137,7 +142,7 @@ impl_ptr!(SharedPtr<T>, Arc<T>);
 /// where `T` is a base of the actual stored type.
 #[repr(transparent)]
 pub struct WeakPtr<T: PropertyClass> {
-    value: Option<Weak<dyn PropertyClass>>,
+    pub(crate) value: Option<Weak<dyn PropertyClass>>,
     _t: PhantomData<T>,
 }
 

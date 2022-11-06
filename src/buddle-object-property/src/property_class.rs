@@ -80,6 +80,14 @@ pub trait PropertyClass: Type {
         })
     }
 
+    /// Gets the base [`PropertyClass`] object associated
+    /// with this one, if exists.
+    fn base(&self) -> Option<&dyn PropertyClass>;
+
+    /// Gets the base [`PropertyClass`] object associated
+    /// with this one, if exists.
+    fn base_mut(&mut self) -> Option<&mut dyn PropertyClass>;
+
     /// Implementation-specific behavior for classes before
     /// they are serialized.
     fn on_pre_save(&mut self) {}
@@ -100,14 +108,6 @@ pub trait PropertyClass: Type {
 /// Extension trait to [`PropertyClass`] which provides
 /// shortcuts for downcasting/accessing bases.
 pub trait PropertyClassExt: PropertyClass {
-    /// Gets the base [`PropertyClass`] object associated
-    /// with this one, if exists.
-    fn base(&self) -> Option<&dyn PropertyClass>;
-
-    /// Gets the base [`PropertyClass`] object associated
-    /// with this one, if exists.
-    fn base_mut(&mut self) -> Option<&mut dyn PropertyClass>;
-
     /// Recursively tries to find a base class `T` in the
     /// emulated inheritance tree.
     fn base_as<T: PropertyClass>(&self) -> Option<&T> {
@@ -145,26 +145,5 @@ pub trait PropertyClassExt: PropertyClass {
     }
 }
 
-impl PropertyClassExt for dyn PropertyClass {
-    fn base(&self) -> Option<&dyn PropertyClass> {
-        let list = self.property_list();
-        list.base_value(self)
-    }
-
-    fn base_mut(&mut self) -> Option<&mut dyn PropertyClass> {
-        let list = self.property_list();
-        list.base_value_mut(self)
-    }
-}
-
-impl<P: PropertyClass> PropertyClassExt for P {
-    fn base(&self) -> Option<&dyn PropertyClass> {
-        let list = self.property_list();
-        list.base_value(self)
-    }
-
-    fn base_mut(&mut self) -> Option<&mut dyn PropertyClass> {
-        let list = self.property_list();
-        list.base_value_mut(self)
-    }
-}
+impl PropertyClassExt for dyn PropertyClass {}
+impl<P: PropertyClass> PropertyClassExt for P {}

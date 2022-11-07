@@ -1,77 +1,60 @@
-use std::{
-    marker::PhantomData,
-    sync::{Arc, Weak},
-};
+use std::marker::PhantomData;
 
 use crate::{PropertyClass, PropertyClassExt};
-
-macro_rules! impl_ptr {
-    ($ty:ty, $ptr:ty) => {
-        impl<T: PropertyClass> $ty {
-            /// Creates a new pointer to a default-initialized
-            /// value.
-            pub fn new() -> Self
-            where
-                T: Default,
-            {
-                Self {
-                    value: Some(<$ptr>::default()),
-                    _t: PhantomData,
-                }
-            }
-
-            /// Creates a new pointer initialized to null.
-            #[inline]
-            pub const fn null() -> Self {
-                Self {
-                    value: None,
-                    _t: PhantomData,
-                }
-            }
-
-            /// Whether the pointer is null, i.e. does not
-            /// point to any value.
-            #[inline]
-            pub const fn is_null(&self) -> bool {
-                self.value.is_none()
-            }
-
-            /// Gets the raw value of the stored object.
-            pub fn get_raw(&self) -> Option<&dyn PropertyClass> {
-                self.value.as_deref()
-            }
-        }
-
-        impl<T: PropertyClass> Default for $ty {
-            fn default() -> Self {
-                Self::null()
-            }
-        }
-    };
-}
 
 /// A simulated C++ pointer which can be serialized.
 ///
 /// A `Ptr<T>` can hold any [`PropertyClass`] value
 /// where `T` is a base of the actual stored type.
 #[repr(transparent)]
-pub struct Ptr<T: PropertyClass> {
+pub struct Ptr<T> {
+    // Invariant: Must be derived from `T`.
     pub(crate) value: Option<Box<dyn PropertyClass>>,
     _t: PhantomData<T>,
 }
 
 impl<T: PropertyClass> Ptr<T> {
     /// Creates a new pointer to the given `value`.
-    pub fn new_with_value(value: T) -> Self {
+    ///
+    /// If `value` is not derived from `T`, this
+    /// will return [`None`].
+    pub fn try_new(value: Box<dyn PropertyClass>) -> Option<Self> {
+        if value.base_as::<T>().is_some() {
+            Some(Self {
+                value,
+                _t: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new pointer to the given `value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `value` is not derived from `T`.
+    pub fn new(value: Box<dyn PropertyClass>) -> Self {
+        Self::try_new().unwrap()
+    }
+
+    /// Creates a new pointer initialized to null.
+    pub const fn null() -> Self {
         Self {
-            value: Some(Box::<T>::from(value)),
+            value: None,
             _t: PhantomData,
         }
     }
 
-    /// Sets the pointed-to value to the supplied one.
-    pub fn set(&mut self, value: T) {
-        self.value = Some(Box::<T>::from(value));
+    /// Whether the pointer is null, i.e. does not
+    /// point to any value.
+    pub const fn is_null(&self) -> bool {
+        self.value.is_none()
+    }
+
+    /// Gets the raw value of the stored object.
+    pub fn get_raw(&self) -> Option<&dyn PropertyClass> {
+        self.value.as_deref()
     }
 
     /// Gets the inner value as a `T` reference,
@@ -87,74 +70,32 @@ impl<T: PropertyClass> Ptr<T> {
     pub fn get_mut(&mut self) -> Option<&mut T> {
         self.value.as_mut().map(|p| p.base_as_mut::<T>().unwrap())
     }
-}
 
-impl_ptr!(Ptr<T>, Box<T>);
-
-/// A simulated C++ pointer with the semantics of a
-/// `std::shared_ptr` which can be serialized.
-///
-/// A `SharedPtr<T>` can hold any [`PropertyClass`] value
-/// where `T` is a base of the actual stored type.
-#[repr(transparent)]
-pub struct SharedPtr<T: PropertyClass> {
-    pub(crate) value: Option<Arc<dyn PropertyClass>>,
-    _t: PhantomData<T>,
-}
-
-impl<T: PropertyClass> SharedPtr<T> {
-    /// Creates a new pointer to the given `value`.
-    pub fn new_with_value(value: T) -> Self {
-        Self {
-            value: Some(Arc::<T>::from(value)),
-            _t: PhantomData,
-        }
+    /// Gets the inner value downcasted to `U`,
+    /// if that's the actual pointer type.
+    ///
+    /// If the pointer is null or `U` does not
+    /// match the stored type, [`None`] will be
+    /// returned.
+    pub fn get_downcast<U: PropertyClass>(&self) -> Option<&U> {
+        self.value.as_ref().and_then(|p| p.as_type().downcast_ref())
     }
 
-    /// Sets the pointed-to value to the supplied one.
-    pub fn set(&mut self, value: T) {
-        self.value = Some(Arc::<T>::from(value));
-    }
-
-    /// Gets the inner value as a `T` reference,
-    /// if the pointer is non-null.
-    #[inline]
-    pub fn get(&self) -> Option<&T> {
-        self.value.as_ref().map(|p| p.base_as::<T>().unwrap())
-    }
-
-    /// Gets the value as a [`WeakPtr`] without strong
-    /// refcounting semantics.
-    pub fn downgrade(&self) -> WeakPtr<T> {
-        WeakPtr {
-            value: self.value.as_ref().map(Arc::downgrade),
-            _t: PhantomData,
-        }
+    /// Gets the inner value downcasted to `U`,
+    /// if that's the actual pointer type.
+    ///
+    /// If the pointer is null or `U` does not
+    /// match the stored type, [`None`] will be
+    /// returned.
+    pub fn get_downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
+        self.value.as_mut().and_then(|p| p.as_type_mut().downcast_mut())
     }
 }
 
-impl_ptr!(SharedPtr<T>, Arc<T>);
+// TODO: Clone, Copy, Debug traits?
 
-/// A simulated C++ pointer with the semantics of a
-/// `std::weak_ptr` which can be serialized.
-///
-/// A `WeakPtr<T>` can hold any [`PropertyClass`] value
-/// where `T` is a base of the actual stored type.
-#[repr(transparent)]
-pub struct WeakPtr<T: PropertyClass> {
-    pub(crate) value: Option<Weak<dyn PropertyClass>>,
-    _t: PhantomData<T>,
-}
-
-impl<T: PropertyClass> WeakPtr<T> {
-    /// Tries to upgrade the weak pointer into a [`SharedPtr`]
-    /// if there are still strong references.
-    pub fn upgrade(&self) -> Option<SharedPtr<T>> {
-        self.value.as_ref().and_then(|value| {
-            Some(SharedPtr {
-                value: Some(value.upgrade()?),
-                _t: PhantomData,
-            })
-        })
+impl<T: PropertyClass> Default for Ptr<T> {
+    fn default() -> Self {
+        Self::null()
     }
 }

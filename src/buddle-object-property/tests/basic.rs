@@ -1,6 +1,6 @@
 use buddle_object_property::{
     type_info::{PropertyFlags, TypeInfo},
-    Enum, PropertyClass, PropertyClassExt, Type,
+    Enum, PropertyClass, PropertyClassExt, Type, cpp::Ptr,
 };
 
 #[test]
@@ -129,4 +129,13 @@ fn enum_reflection() {
 
     assert_eq!(Foo::from_variant("A"), Some(Foo::A));
     assert_eq!(Foo::B.value(), 2);
+}
+
+#[test]
+fn test_ptr() {
+    #[derive(Default, Type)]
+    pub struct Foo {
+        #[property()]
+        a: Ptr<Foo>,
+    }
 }

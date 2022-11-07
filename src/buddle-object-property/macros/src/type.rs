@@ -46,13 +46,13 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
     let ty = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let name = input
+    let (name, name_option) = input
         .attrs
         .object
         .as_ref()
         .and_then(|o| o.name())
-        .map(|name| quote!(Some(#name)))
-        .unwrap_or_else(|| quote!(None));
+        .map(|name| (quote!(#name), quote!(Some(#name))))
+        .unwrap_or_else(|| (quote!(#path::__private::type_name::<Self>()), quote!(None)));
 
     let base = {
         let mut fields = input
@@ -128,10 +128,12 @@ fn derive_struct(input: ast::Struct<'_>, path: &Path) -> Result<TokenStream> {
             unsafe impl #impl_generics #reflected for #ty #ty_generics
                 #where_clause
             {
+                const TYPE_NAME: &'static str = #name;
+
                 const TYPE_INFO: &'static #path::type_info::TypeInfo = unsafe {
                     &#path::type_info::TypeInfo::Class(
                         #path::type_info::PropertyList::new::<#ty #ty_generics>(
-                            ::std::option::Option::#name,
+                            ::std::option::Option::#name_option,
                             #base,
                             &__PROPERTIES,
                         )
@@ -263,6 +265,8 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
         unsafe impl #impl_generics #reflected for #ty #ty_generics
             #where_clause
         {
+            const TYPE_NAME: &'static str = Self::TYPE_INFO.type_name();
+
             const TYPE_INFO: &'static #path::type_info::TypeInfo =
                 &#path::type_info::TypeInfo::leaf::<#ty #ty_generics>(
                     ::std::option::Option::None

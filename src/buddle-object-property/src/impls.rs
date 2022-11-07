@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{any::TypeId, collections::VecDeque};
 
 use crate::{
     cpp::*,
@@ -19,6 +19,8 @@ macro_rules! impl_leaf_info_for {
     ($ty:ty) => {
         // SAFETY: User is responsible for meeting the invariants.
         unsafe impl $crate::type_info::Reflected for $ty {
+            const TYPE_NAME: &'static str = $crate::__private::type_name::<Self>();
+
             const TYPE_INFO: &'static $crate::type_info::TypeInfo =
                 &$crate::type_info::TypeInfo::leaf::<$ty>(::std::option::Option::None);
         }
@@ -27,6 +29,8 @@ macro_rules! impl_leaf_info_for {
     ($ty:ty, $name:expr) => {
         // SAFETY: User is responsible for meeting the invariants.
         unsafe impl $crate::type_info::Reflected for $ty {
+            const TYPE_NAME: &'static str = $name;
+
             const TYPE_INFO: &'static $crate::type_info::TypeInfo =
                 &$crate::type_info::TypeInfo::leaf::<$ty>(::std::option::Option::Some($name));
         }
@@ -176,8 +180,9 @@ impl Type for RawWideString {
 macro_rules! impl_container {
     ($ty:path, $deref:ty, $push:ident, $pop:ident) => {
         unsafe impl<T: Default + Reflected + Type> Reflected for $ty {
-            const TYPE_INFO: &'static TypeInfo =
-                &TypeInfo::leaf::<$ty>(Some(<T as Reflected>::TYPE_INFO.type_name()));
+            const TYPE_NAME: &'static str = T::TYPE_NAME;
+
+            const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<$ty>(Some(Self::TYPE_NAME));
         }
 
         impl<T: Default + Reflected + Type> Type for $ty {
@@ -271,7 +276,13 @@ impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
 
 unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
-    const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<Self>(None);
+    const TYPE_NAME: &'static str = T::TYPE_NAME;
+
+    const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+        type_name: Self::TYPE_NAME,
+        type_hash: 0, // TODO: Hash type_name + "*".
+        type_id: TypeId::of::<Self>(),
+    });
 }
 
 impl<T: Reflected + PropertyClass> Type for Ptr<T> {

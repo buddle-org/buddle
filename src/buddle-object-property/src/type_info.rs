@@ -23,6 +23,13 @@ pub use self::value::*;
 /// must always have [`PropertyList`] returned, whereas all
 /// other types use [`ValueInfo`].
 pub unsafe trait Reflected {
+    /// The name of the type.
+    ///
+    /// If reflected types feel the need to build static
+    /// type info based on the name of a different type,
+    /// this can be used to avoid cyclic drop checks.
+    const TYPE_NAME: &'static str;
+
     /// A reference to the [`TypeInfo`] object.
     const TYPE_INFO: &'static TypeInfo;
 }

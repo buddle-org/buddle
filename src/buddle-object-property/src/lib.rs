@@ -55,6 +55,14 @@ pub use self::r#type::*;
 
 #[doc(hidden)]
 pub mod __private {
+    /// Wrapper around [`std::any::type_name`] for codegen.
+    ///
+    /// Doesn't require enabling the `const_type_name`
+    /// nightly feature in user code.
+    pub const fn type_name<T: ?Sized>() -> &'static str {
+        std::any::type_name::<T>()
+    }
+
     /// Computes the offset to a struct field for
     /// pointer access.
     pub macro offset_of($ty:path, $field:ident) {{

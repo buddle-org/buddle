@@ -2,7 +2,7 @@ use std::{any::TypeId, collections::VecDeque};
 
 use crate::{
     cpp::*,
-    serde::{self, de::DynDeserializer, ser::DynSerializer, Baton},
+    serde::{self, de::DynDeserializer, ser::DynSerializer, Baton, IdentityType},
     type_info::*,
     Container, ContainerIter, PropertyClass, PropertyClassExt, Type, TypeMut, TypeOwned, TypeRef,
 };
@@ -271,11 +271,7 @@ impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
 
 unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
-    const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
-        type_name: T::TYPE_INFO.type_name(),
-        type_hash: 0, // TODO: Hash type_name + "*".
-        type_id: TypeId::of::<Self>(),
-    });
+    const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<Self>(None);
 }
 
 impl<T: Reflected + PropertyClass> Type for Ptr<T> {
@@ -330,7 +326,7 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
     fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
         // First, serialize the identity of the object we have one.
         let identity = self.value.as_ref().map(|v| v.property_list());
-        serializer.identity(identity, baton)?;
+        serializer.identity(identity, IdentityType::RawPtr, baton)?;
 
         // When a value is also present, serialize it.
         if let Some(value) = self.value.as_deref() {
@@ -345,7 +341,7 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
         deserializer: &mut dyn DynDeserializer,
         baton: Baton,
     ) -> serde::Result<()> {
-        if let Some(identity) = deserializer.identity(baton)? {
+        if let Some(identity) = deserializer.identity(IdentityType::RawPtr, baton)? {
             // Create the default instance of the type we're expecting.
             if let Err(e) = self.as_type_mut().set(identity.make_default()) {
                 return Err(serde::Error::custom(format_args!(

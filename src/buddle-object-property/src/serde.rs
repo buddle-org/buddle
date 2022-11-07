@@ -13,6 +13,16 @@ pub use self::result::*;
 
 pub mod ser;
 
+/// The value type that corresponds to the identity.
+pub enum IdentityType {
+    /// A plain value type.
+    Value,
+    /// A raw pointer.
+    RawPtr,
+    /// A shared pointer.
+    SharedPtr,
+}
+
 /// A baton that is passed around during serialization.
 ///
 /// This effectively does nothing but prevent users from
@@ -35,7 +45,7 @@ pub fn serialize_class<T: PropertyClass>(
     v: &T,
     baton: Baton,
 ) -> Result<()> {
-    serializer.identity(Some(v.property_list()), baton)?;
+    serializer.identity(Some(v.property_list()), IdentityType::Value, baton)?;
     serializer.class(v, baton)
 }
 
@@ -50,7 +60,7 @@ pub fn deserialize_class<T: PropertyClass>(
     v: &mut T,
     baton: Baton,
 ) -> Result<()> {
-    let list = deserializer.identity(baton)?;
+    let list = deserializer.identity(IdentityType::Value, baton)?;
     let list = list.as_ref();
 
     if list.map(|l| l.is::<T>()).unwrap_or(false) {

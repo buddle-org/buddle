@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use super::{result::*, Baton};
+use super::{result::*, Baton, IdentityType};
 use crate::{type_info::PropertyList, Container, Enum, PropertyClass};
 
 mod sealed {
@@ -69,6 +69,7 @@ pub trait Layout {
         &mut self,
         m: &mut dyn Marshal,
         v: Option<&'static PropertyList>,
+        ty: IdentityType,
         baton: Baton,
     ) -> Result<()>;
 
@@ -107,7 +108,12 @@ pub trait DynSerializer: sealed::Sealed {
     /// The identity is a per-class unique piece of
     /// information the deserializer can use to dynamically
     /// identify the serialized object's type.
-    fn identity(&mut self, v: Option<&'static PropertyList>, baton: Baton) -> Result<()>;
+    fn identity(
+        &mut self,
+        v: Option<&'static PropertyList>,
+        ty: IdentityType,
+        baton: Baton,
+    ) -> Result<()>;
 
     /// Serializes a [`PropertyClass`] object into the
     /// described format.
@@ -176,8 +182,12 @@ impl<M: Marshal, L: Layout, Ext: SerializerExt> Serializer<M, L, Ext> {
         Ext::pre(&mut self)?;
 
         obj.on_pre_load();
-        self.layout
-            .identity(&mut self.marshal, Some(obj.property_list()), baton)?;
+        self.layout.identity(
+            &mut self.marshal,
+            Some(obj.property_list()),
+            IdentityType::Value,
+            baton,
+        )?;
         self.layout.class(&mut self.marshal, obj, baton)?;
         obj.on_post_load();
 
@@ -196,8 +206,13 @@ impl<M: Marshal, L: Layout, Ext: SerializerExt> DynSerializer for Serializer<M, 
         self.marshal.human_readable()
     }
 
-    fn identity(&mut self, v: Option<&'static PropertyList>, baton: Baton) -> Result<()> {
-        self.layout.identity(&mut self.marshal, v, baton)
+    fn identity(
+        &mut self,
+        v: Option<&'static PropertyList>,
+        ty: IdentityType,
+        baton: Baton,
+    ) -> Result<()> {
+        self.layout.identity(&mut self.marshal, v, ty, baton)
     }
 
     fn class(&mut self, v: &dyn PropertyClass, baton: Baton) -> Result<()> {

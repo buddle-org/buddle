@@ -10,7 +10,7 @@ use crate::{PropertyClass, PropertyClassExt};
 pub struct Ptr<T> {
     // Invariant: Must be derived from `T`.
     pub(crate) value: Option<Box<dyn PropertyClass>>,
-    _t: PhantomData<T>,
+    _t: PhantomData<Box<T>>,
 }
 
 impl<T: PropertyClass> Ptr<T> {

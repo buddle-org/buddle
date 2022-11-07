@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use super::{result::*, Baton};
+use super::{result::*, Baton, IdentityType};
 use crate::{type_info::PropertyList, Enum, PropertyClass, Type};
 
 mod sealed {
@@ -68,6 +68,7 @@ pub trait Layout {
     fn identity(
         &mut self,
         m: &mut dyn Unmarshal,
+        ty: IdentityType,
         baton: Baton,
     ) -> Result<Option<&'static PropertyList>>;
 
@@ -123,7 +124,8 @@ pub trait DynDeserializer: sealed::Sealed {
     /// The identity is a per-class unique piece of
     /// information the deserializer can use to dynamically
     /// identify the serialized object's type.
-    fn identity(&mut self, baton: Baton) -> Result<Option<&'static PropertyList>>;
+    fn identity(&mut self, ty: IdentityType, baton: Baton)
+        -> Result<Option<&'static PropertyList>>;
 
     /// Deserializes a [`PropertyClass`] object from the
     /// described format in-place.
@@ -219,7 +221,10 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> Deserializer<M, L, Ext> {
 
         Ext::pre(&mut self)?;
 
-        if let Some(identity) = self.layout.identity(&mut self.unmarshal, baton)? {
+        if let Some(identity) =
+            self.layout
+                .identity(&mut self.unmarshal, IdentityType::Value, baton)?
+        {
             let mut object = identity.make_default();
 
             object.on_pre_load();
@@ -260,8 +265,12 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> DynDeserializer for Deserial
         self.unmarshal.human_readable()
     }
 
-    fn identity(&mut self, baton: Baton) -> Result<Option<&'static PropertyList>> {
-        self.layout.identity(&mut self.unmarshal, baton)
+    fn identity(
+        &mut self,
+        ty: IdentityType,
+        baton: Baton,
+    ) -> Result<Option<&'static PropertyList>> {
+        self.layout.identity(&mut self.unmarshal, ty, baton)
     }
 
     fn class(&mut self, v: &mut dyn PropertyClass, baton: Baton) -> Result<()> {

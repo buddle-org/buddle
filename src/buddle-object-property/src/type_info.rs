@@ -5,9 +5,6 @@ use std::any::TypeId;
 
 use crate::Type;
 
-mod cell;
-pub use self::cell::*;
-
 mod class;
 pub use self::class::*;
 

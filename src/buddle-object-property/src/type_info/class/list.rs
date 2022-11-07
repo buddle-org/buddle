@@ -6,28 +6,6 @@ use std::{
 use super::{Property, PropertyAccess};
 use crate::{type_info::ValueInfo, PropertyClass, Type};
 
-#[derive(Clone, Copy, Debug)]
-struct DefaultClosureWrapper {
-    list: &'static PropertyList,
-    ptr: fn(list: &'static PropertyList) -> Box<dyn PropertyClass>,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum DefaultFnHelper {
-    Closure(DefaultClosureWrapper),
-    Ptr(fn() -> Box<dyn PropertyClass>),
-}
-
-impl DefaultFnHelper {
-    #[inline]
-    pub fn call(self) -> Box<dyn PropertyClass> {
-        match self {
-            Self::Closure(f) => (f.ptr)(f.list),
-            Self::Ptr(f) => f(),
-        }
-    }
-}
-
 /// A type description of a [`PropertyClass`] layout for
 /// reflective interaction.
 #[derive(Clone, Debug)]
@@ -36,7 +14,7 @@ pub struct PropertyList {
 
     base: Option<Property>,
     properties: &'static [Property],
-    default_fn: DefaultFnHelper,
+    default_fn: fn() -> Box<dyn PropertyClass>,
 
     class_meta: DynMetadata<dyn PropertyClass>,
 }
@@ -82,55 +60,9 @@ impl PropertyList {
 
             base,
             properties,
-            default_fn: DefaultFnHelper::Ptr(T::make_default),
+            default_fn: T::make_default,
 
             class_meta: ptr::metadata::<dyn PropertyClass>(ptr::null::<T>()),
-        }
-    }
-
-    /// Creates a new property list for a pointer type,
-    /// based on the list of the value type.
-    ///
-    /// # Safety
-    ///
-    /// `basis` must be the [`PropertyList`] for the
-    /// `Pointed` type.
-    pub(crate) const unsafe fn new_ptr<Ptr: PropertyClass>(
-        name: &'static str,
-        basis: &'static PropertyList,
-        _prefix: &str,
-        _suffix: &str,
-    ) -> Self {
-        Self {
-            // We want the type info of `basis` for the most part,
-            // except that we still need to report a correct TypeId
-            // for the wrapped type to meet reflection invariants.
-            type_info: ValueInfo {
-                type_name: name,
-                type_hash: 0, // FIXME: hash prefix + type_name + suffix.
-                type_id: TypeId::of::<Ptr>(),
-            },
-
-            // We are largely a mirror of `basis` except that we do
-            // not want to default-construct the `Pointed` object,
-            // but the `Ptr` itself.
-            base: basis.base,
-            properties: basis.properties,
-            default_fn: DefaultFnHelper::Closure(DefaultClosureWrapper {
-                list: basis,
-                ptr: |basis| {
-                    let mut default = Ptr::make_default();
-                    if default.as_type_mut().set(basis.make_default()).is_err() {
-                        // TODO: Impl Default for dyn Type to make unwrap possible?
-                        panic!();
-                    }
-                    default
-                },
-            }),
-
-            // We want to report the correct metadata since anything
-            // else would lead to UB with accessing base properties.
-            class_meta: ptr::metadata::<dyn PropertyClass>(ptr::null::<Ptr>()),
         }
     }
 
@@ -165,7 +97,7 @@ impl PropertyList {
     /// method and returns its result.
     #[inline]
     pub fn make_default(&self) -> Box<dyn PropertyClass> {
-        self.default_fn.call()
+        (self.default_fn)()
     }
 
     /// Gets the [`PropertyList`] for the base class type,

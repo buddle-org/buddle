@@ -21,7 +21,7 @@ impl<T: PropertyClass> Ptr<T> {
     pub fn try_new(value: Box<dyn PropertyClass>) -> Option<Self> {
         if value.base_as::<T>().is_some() {
             Some(Self {
-                value,
+                value: Some(value),
                 _t: PhantomData,
             })
         } else {
@@ -35,7 +35,7 @@ impl<T: PropertyClass> Ptr<T> {
     ///
     /// Panics if `value` is not derived from `T`.
     pub fn new(value: Box<dyn PropertyClass>) -> Self {
-        Self::try_new().unwrap()
+        Self::try_new(value).unwrap()
     }
 
     /// Creates a new pointer initialized to null.
@@ -88,7 +88,9 @@ impl<T: PropertyClass> Ptr<T> {
     /// match the stored type, [`None`] will be
     /// returned.
     pub fn get_downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
-        self.value.as_mut().and_then(|p| p.as_type_mut().downcast_mut())
+        self.value
+            .as_mut()
+            .and_then(|p| p.as_type_mut().downcast_mut())
     }
 }
 

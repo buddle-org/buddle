@@ -270,31 +270,12 @@ macro_rules! impl_container {
 impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
 
-// SAFETY: `T`'s type info must meet the invariants.
-unsafe impl<T: Reflected + PropertyClass> DynReflected for Ptr<T> {
-    fn type_info(&self) -> &'static TypeInfo {
-        static TYPE_INFO: GenericTypeInfoCell = GenericTypeInfoCell::new();
-
-        // A dummy type with a unique ID for referring to
-        // placeholder type info when the pointer is null.
-        struct Empty;
-
-        match &self.value {
-            Some(value) => TYPE_INFO.get_or_insert::<T, _>(|| {
-                let name = T::TYPE_INFO.type_name();
-                // SAFETY: Correct PropertyList provided for pointed-to type.
-                TypeInfo::Class(unsafe {
-                    PropertyList::new_ptr::<Self>(name, value.property_list(), "", "*")
-                })
-            }),
-
-            None => TYPE_INFO.get_or_insert::<Empty, _>(|| {
-                let name = T::TYPE_INFO.type_name();
-                // SAFETY: No harm can be done with an empty PropertyList.
-                TypeInfo::Class(unsafe { PropertyList::new::<Self>(Some(name), None, &[]) })
-            }),
-        }
-    }
+unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
+    const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+        type_name: T::TYPE_INFO.type_name(),
+        type_hash: 0, // TODO: Hash type_name + "*".
+        type_id: TypeId::of::<Self>(),
+    });
 }
 
 impl<T: Reflected + PropertyClass> Type for Ptr<T> {
@@ -319,15 +300,15 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
     }
 
     fn type_ref(&self) -> TypeRef<'_> {
-        TypeRef::Class(self)
+        TypeRef::Value(self)
     }
 
     fn type_mut(&mut self) -> TypeMut<'_> {
-        TypeMut::Class(self)
+        TypeMut::Value(self)
     }
 
     fn type_owned(self: ::std::boxed::Box<Self>) -> TypeOwned {
-        TypeOwned::Class(self)
+        TypeOwned::Value(self)
     }
 
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
@@ -380,90 +361,5 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
         }
 
         Ok(())
-    }
-}
-
-impl<T: Reflected + PropertyClass> PropertyClass for Ptr<T> {
-    fn make_default() -> Box<dyn PropertyClass>
-    where
-        Self: Sized,
-    {
-        Box::<Self>::default()
-    }
-
-    fn property(&self, view: PropertyAccess<'_>) -> Option<&dyn Type> {
-        match &self.value {
-            Some(value) => view.value(TypeId::of::<Self>()).map(|property| {
-                let ptr = &**value as *const dyn PropertyClass;
-
-                // SAFETY: We're coming from a reference, so the
-                // pointer is valid. The inferred lifetime will
-                // be that of `self`.
-                //
-                // Since the properties in a list for this type
-                // are copied over from `value`'s list, this is
-                // a safe way of accessing them.
-                unsafe { property.value(ptr.cast()) }
-            }),
-
-            None => None,
-        }
-    }
-
-    fn property_mut(&mut self, view: PropertyAccess<'_>) -> Option<&mut dyn Type> {
-        match &mut self.value {
-            Some(value) => view.value(TypeId::of::<Self>()).map(|property| {
-                let ptr = &mut **value as *mut dyn PropertyClass;
-
-                // SAFETY: We're coming from a reference, so the
-                // pointer is valid. The inferred lifetime will
-                // be that of `self`.
-                //
-                // Since the properties in a list for this type
-                // are copied over from `value`'s list, this is
-                // a safe way of accessing them.
-                unsafe { property.value_mut(ptr.cast()) }
-            }),
-
-            None => None,
-        }
-    }
-
-    fn base(&self) -> ::std::option::Option<&dyn PropertyClass> {
-        let list = self.property_list();
-        self.value
-            .as_deref()
-            .and_then(|value| list.base_value(value))
-    }
-
-    fn base_mut(&mut self) -> ::std::option::Option<&mut dyn PropertyClass> {
-        let list = self.property_list();
-        self.value
-            .as_deref_mut()
-            .and_then(|value| list.base_value_mut(value))
-    }
-
-    fn on_pre_save(&mut self) {
-        if let Some(value) = &mut self.value {
-            value.on_pre_save();
-        }
-    }
-
-    fn on_post_save(&mut self) {
-        if let Some(value) = &mut self.value {
-            value.on_post_save();
-        }
-    }
-
-    fn on_pre_load(&mut self) {
-        if let Some(value) = &mut self.value {
-            value.on_pre_load();
-        }
-    }
-
-    fn on_post_load(&mut self) {
-        if let Some(value) = &mut self.value {
-            value.on_post_load();
-        }
     }
 }

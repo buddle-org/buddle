@@ -28,7 +28,7 @@ pub struct Baton(pub(super) ());
 /// serializer.
 ///
 /// This may be used for effortless and consistent
-/// implementations of [`Type::serialize`] for
+/// implementations of [`Type::serialize`][crate::Type::serialize] for
 /// custom types.
 pub fn serialize_class<T: PropertyClass>(
     serializer: &mut dyn ser::DynSerializer,
@@ -43,7 +43,7 @@ pub fn serialize_class<T: PropertyClass>(
 /// deserializer.
 ///
 /// This may be used for effortless and consistent
-/// implementations of [`Type::deserialize`] for
+/// implementations of [`Type::deserialize`][crate::Type::deserialize] for
 /// custom types.
 pub fn deserialize_class<T: PropertyClass>(
     deserializer: &mut dyn de::DynDeserializer,

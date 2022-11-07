@@ -85,7 +85,7 @@ pub trait Layout {
         baton: Baton,
     ) -> Result<()>;
 
-    /// Deserializes a [`Container`] object in-place from the
+    /// Deserializes a [`Container`][crate::Container] object in-place from the
     /// described format.
     ///
     /// The provided `f` should use [`ContainerVisitor`]
@@ -134,7 +134,7 @@ pub trait DynDeserializer: sealed::Sealed {
     /// is responsible for that.
     fn class(&mut self, v: &mut dyn PropertyClass, baton: Baton) -> Result<()>;
 
-    /// Deserializes a [`Container`] object from the
+    /// Deserializes a [`Container`][crate::Container] object from the
     /// described format in-place.
     ///
     /// The provided `f` should use [`ContainerVisitor`]
@@ -152,7 +152,7 @@ pub trait DynDeserializer: sealed::Sealed {
     fn enum_variant(&mut self, v: &mut dyn Enum, baton: Baton) -> Result<()>;
 }
 
-/// A visitor for dynamically deserializing [`Container`]s.
+/// A visitor for dynamically deserializing [`Container`][crate::Container]s.
 ///
 /// Implementations should cache their [`DynDeserializer`]
 /// at construction and use it for the implementation of the

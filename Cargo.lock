@@ -155,6 +155,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "buddle-object-property-macros",
+ "thiserror",
 ]
 
 [[package]]

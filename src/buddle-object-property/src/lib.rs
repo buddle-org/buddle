@@ -43,6 +43,8 @@ pub use self::r#enum::*;
 
 mod impls;
 
+pub mod path;
+
 mod property_class;
 pub use self::property_class::*;
 

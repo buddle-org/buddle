@@ -1,4 +1,4 @@
-use std::{any::TypeId, collections::VecDeque};
+use std::{any::TypeId, collections::VecDeque, sync::Arc};
 
 use crate::{
     cpp::*,
@@ -367,6 +367,153 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
             self.value = None;
         }
 
+        Ok(())
+    }
+}
+
+unsafe impl<T: Reflected + PropertyClass> Reflected for SharedPtr<T> {
+    const TYPE_NAME: &'static str = T::TYPE_NAME;
+
+    const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+        type_name: Self::TYPE_NAME,
+        type_hash: 0, // TODO: Hash "class SharedPointer<" type_name + ">".
+        type_id: TypeId::of::<Self>(),
+    });
+}
+
+impl<T: Reflected + PropertyClass> Type for SharedPtr<T> {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn as_type(&self) -> &dyn Type {
+        self
+    }
+
+    fn as_type_mut(&mut self) -> &mut dyn Type {
+        self
+    }
+
+    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+        self
+    }
+
+    fn type_ref(&self) -> TypeRef<'_> {
+        TypeRef::Value(self)
+    }
+
+    fn type_mut(&mut self) -> TypeMut<'_> {
+        TypeMut::Value(self)
+    }
+
+    fn type_owned(self: ::std::boxed::Box<Self>) -> TypeOwned {
+        TypeOwned::Value(self)
+    }
+
+    fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
+        match value.downcast::<Self>() {
+            Ok(value) => {
+                *self = *value;
+                Ok(())
+            }
+            Err(value) => match value.type_owned() {
+                TypeOwned::Class(c) if c.base_as::<T>().is_some() => {
+                    self.value = Some(Arc::from(c));
+                    Ok(())
+                }
+                x => Err(x.into_type()),
+            },
+        }
+    }
+
+    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
+        // First, serialize the identity of the object we have one.
+        let identity = self.value.as_ref().map(|v| v.property_list());
+        serializer.identity(identity, IdentityType::RawPtr, baton)?;
+
+        // When a value is also present, serialize it.
+        if let Some(value) = self.value.as_deref() {
+            serializer.class(value, baton)?;
+        }
+
+        Ok(())
+    }
+
+    fn deserialize(
+        &mut self,
+        deserializer: &mut dyn DynDeserializer,
+        baton: Baton,
+    ) -> serde::Result<()> {
+        if let Some(identity) = deserializer.identity(IdentityType::RawPtr, baton)? {
+            // Create the default instance of the type we're expecting.
+            if let Err(e) = self.as_type_mut().set(identity.make_default()) {
+                return Err(serde::Error::custom(format_args!(
+                    "Failed to deserialize incompatible pointer type {}",
+                    e.type_info().type_name()
+                )));
+            }
+
+            // Deserialize the pointed-to value.
+            // We previously just set the value, so we shouldn't
+            // have any borrowers which would make unwrap fail.
+            deserializer.class(self.value.as_mut().and_then(Arc::get_mut).unwrap(), baton)?;
+        } else {
+            self.value = None;
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl<T: Reflected + PropertyClass> Reflected for WeakPtr<T> {
+    const TYPE_NAME: &'static str = T::TYPE_NAME;
+
+    const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+        type_name: Self::TYPE_NAME,
+        type_hash: 0, // TODO: Hash "class WeakPointer>" + type_name + ">".
+        type_id: TypeId::of::<Self>(),
+    });
+}
+
+impl<T: Reflected + PropertyClass> Type for WeakPtr<T> {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn as_type(&self) -> &dyn Type {
+        self
+    }
+
+    fn as_type_mut(&mut self) -> &mut dyn Type {
+        self
+    }
+
+    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+        self
+    }
+
+    fn type_ref(&self) -> TypeRef<'_> {
+        TypeRef::Value(self)
+    }
+
+    fn type_mut(&mut self) -> TypeMut<'_> {
+        TypeMut::Value(self)
+    }
+
+    fn type_owned(self: ::std::boxed::Box<Self>) -> TypeOwned {
+        TypeOwned::Value(self)
+    }
+
+    fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
+        *self = *value.downcast()?;
         Ok(())
     }
 }

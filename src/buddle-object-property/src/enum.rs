@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::Type;
 
 /// A reflected Rust enum with unit variants.
@@ -6,7 +8,7 @@ use crate::Type;
 /// as human-readable strings or unique [`u32`] values.
 pub trait Enum: Type {
     /// Gets the name of this variant as a string.
-    fn variant(&self) -> &'static str;
+    fn variant(&self) -> Cow<'static, str>;
 
     /// Updates the value of `self` to the new variant
     /// given as a string.

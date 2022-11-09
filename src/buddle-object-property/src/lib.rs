@@ -57,6 +57,8 @@ pub use self::r#type::*;
 
 #[doc(hidden)]
 pub mod __private {
+    pub use bitflags::bitflags;
+
     /// Wrapper around [`std::any::type_name`] for codegen.
     ///
     /// Doesn't require enabling the `const_type_name`

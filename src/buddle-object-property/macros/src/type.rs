@@ -341,9 +341,12 @@ fn derive_enum(input: ast::Enum<'_>, path: &Path) -> Result<TokenStream> {
         }
 
         impl #impl_generics #enum_trait for #ty #ty_generics #where_clause {
-            fn variant(&self) -> &'static ::std::primitive::str {
+            fn variant(&self) -> ::std::borrow::Cow<'static, ::std::primitive::str> {
                 match () {
-                    #(() if ::std::matches!(self, #ty::#idents) => #names,)*
+                    #(
+                        () if ::std::matches!(self, #ty::#idents) =>
+                            ::std::borrow::Cow::Borrowed(#names),
+                    )*
 
                     // For the sake of catching bugs, we want to panic
                     // debug mode if this branch is ever executed.

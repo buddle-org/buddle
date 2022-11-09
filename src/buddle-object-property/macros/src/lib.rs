@@ -15,6 +15,7 @@ extern crate quote;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
+mod bitenum;
 mod r#type;
 mod utils;
 
@@ -23,6 +24,15 @@ mod utils;
 pub fn derive_type(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     r#type::derive(input)
+        .unwrap_or_else(|e| e.to_compile_error())
+        .into()
+}
+
+/// TODO: Document this.
+#[proc_macro]
+pub fn bitenum(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as bitenum::Input);
+    bitenum::expand(input)
         .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }

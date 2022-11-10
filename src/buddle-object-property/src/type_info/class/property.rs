@@ -4,6 +4,7 @@ use std::{
 };
 
 use bitflags::bitflags;
+use buddle_utils::hash::djb2;
 
 use super::PropertyList;
 use crate::{type_info::TypeInfo, PropertyClass, Type};
@@ -96,7 +97,7 @@ impl Property {
 
         Self {
             name,
-            hash: 0, // FIXME: Produce a real hash.
+            hash: djb2(name).wrapping_add(type_info.type_hash()),
             flags,
 
             type_info,

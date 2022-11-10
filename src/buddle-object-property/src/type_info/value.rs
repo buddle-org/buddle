@@ -1,5 +1,7 @@
 use std::any::{type_name, TypeId};
 
+use buddle_utils::hash::string_id;
+
 use crate::Type;
 
 /// [`TypeInfo`] for leaf types.
@@ -26,7 +28,7 @@ impl ValueInfo {
         let type_name = name.unwrap_or_else(type_name::<T>);
         Self {
             type_name,
-            type_hash: 0, // FIXME: Properly hash this.
+            type_hash: string_id(type_name),
             type_id: TypeId::of::<T>(),
         }
     }

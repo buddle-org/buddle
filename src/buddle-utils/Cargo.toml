@@ -1,0 +1,10 @@
+[package]
+name = "buddle-utils"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Commonly shared code for the Buddle project"
+license = "GPL-2.0"
+repository = "https://github.com/buddle-org/buddle.git"
+edition = "2021"
+
+[dependencies]

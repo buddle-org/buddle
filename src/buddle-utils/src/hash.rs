@@ -40,7 +40,14 @@ impl StringIdBuilder {
     ///
     /// This may be called repeatedly to add more substrings
     /// to the final hash.
-    #[inline(always)]
+    #[inline(never)]
+    // LLVM overeagerly tries to vectorize this loop in
+    // optimized builds which results in large codegen.
+    //
+    // But due to our inputs being rather small in most
+    // cases, this is not only a slowdown but also a
+    // revolting source of binary overhead for no gain.
+    #[optimize(size)]
     pub const fn feed(mut self, data: &str) -> Self {
         let bytes = data.as_bytes();
 

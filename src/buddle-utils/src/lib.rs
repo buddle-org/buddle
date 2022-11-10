@@ -1,6 +1,7 @@
 //! Commonly shared code for the Buddle project.
 
 #![deny(rust_2018_idioms, rustdoc::broken_intra_doc_links)]
+#![feature(optimize_attribute)]
 #![forbid(unsafe_code)]
 
 pub mod hash;

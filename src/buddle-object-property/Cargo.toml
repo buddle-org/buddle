@@ -9,6 +9,7 @@ edition = "2021"
 
 [dependencies]
 buddle-object-property-macros = { path = "macros" }
+buddle-math = { path = "../buddle-math" }
 buddle-utils = { path = "../buddle-utils" }
 
 bitflags = "1.3"

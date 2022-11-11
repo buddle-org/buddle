@@ -154,6 +154,7 @@ name = "buddle-math"
 version = "0.1.0"
 dependencies = [
  "glam",
+ "num-traits",
 ]
 
 [[package]]
@@ -161,6 +162,7 @@ name = "buddle-object-property"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "buddle-math",
  "buddle-object-property-macros",
  "buddle-utils",
  "thiserror",

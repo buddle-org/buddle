@@ -1,5 +1,6 @@
 use std::{any::TypeId, collections::VecDeque, sync::Arc};
 
+use buddle_math::*;
 use buddle_utils::hash::StringIdBuilder;
 
 use crate::{
@@ -276,6 +277,101 @@ macro_rules! impl_container {
 
 impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
+
+macro_rules! impl_math {
+    (@glam $ty:ident, $name:expr, $($idents:ident),* $(,)?) => {
+        impl_leaf_info_for!($ty, $name);
+        impl Type for $ty {
+            impl_type_methods!(Value);
+
+            fn serialize(
+                &self,
+                serializer: &mut dyn DynSerializer,
+                b: Baton,
+            ) -> serde::Result<()> {
+                // XXX: Human-readable output?
+                $(
+                    self.$idents.serialize(serializer, b)?;
+                )*
+
+                Ok(())
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn DynDeserializer,
+                b: Baton,
+            ) -> serde::Result<()> {
+                // XXX: Human-readable output?
+                $(
+                    self.$idents.deserialize(deserializer, b)?;
+                )*
+
+                Ok(())
+            }
+        }
+    };
+
+    (@geom $ty:path, $name:expr, $($idents:ident),* $(,)?) => {
+        unsafe impl<T: Reflected + Type> Reflected for $ty {
+            const TYPE_NAME: &'static str = $crate::__private::type_name::<Self>();
+
+            const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+                type_name: Self::TYPE_NAME,
+                type_hash: StringIdBuilder::new()
+                    .feed($name)
+                    .feed("<")
+                    .feed(T::TYPE_NAME)
+                    .feed(">")
+                    .finish(),
+                type_id: TypeId::of::<Self>(),
+            });
+        }
+
+        impl<T: Reflected + Type> Type for $ty {
+            impl_type_methods!(Value);
+
+            fn serialize(
+                &self,
+                serializer: &mut dyn DynSerializer,
+                b: Baton,
+            ) -> serde::Result<()> {
+                // XXX: Human-readable output?
+                $(
+                    self.$idents.serialize(serializer, b)?;
+                )*
+
+                Ok(())
+            }
+
+            fn deserialize(
+                &mut self,
+                deserializer: &mut dyn DynDeserializer,
+                b: Baton,
+            ) -> serde::Result<()> {
+                // XXX: Human-readable output?
+                $(
+                    self.$idents.deserialize(deserializer, b)?;
+                )*
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_math!(@glam Vec3, "class Vector3D", x, y, z);
+impl_math!(@glam Vec3A, "class Vector3D", x, y, z);
+
+impl_math!(@glam Mat3, "class Matrix3x3", x_axis, y_axis, z_axis);
+impl_math!(@glam Mat3A, "class Matrix3x3", x_axis, y_axis, z_axis);
+
+impl_math!(@glam Quat, "class Quaternion", x, y, z, w);
+
+impl_math!(@geom Point<T>, "class Point", x, y);
+impl_math!(@geom Size<T>, "class Size", width, height);
+impl_math!(@geom Rect<T>, "class Rect", left, top, right, bottom);
+impl_math!(@glam Euler, "class Euler", pitch, yaw, roll); // TODO: Is this order correct?
 
 unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
     const TYPE_NAME: &'static str = T::TYPE_NAME;

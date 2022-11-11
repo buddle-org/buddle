@@ -1,7 +1,7 @@
 use std::{any::TypeId, collections::VecDeque, sync::Arc};
 
 use buddle_math::*;
-use buddle_utils::hash::StringIdBuilder;
+use buddle_utils::{color::Color, hash::StringIdBuilder};
 
 use crate::{
     cpp::*,
@@ -278,8 +278,8 @@ macro_rules! impl_container {
 impl_container!(Vec<T>, [T], push, pop);
 impl_container!(VecDeque<T>, Self, push_back, pop_back);
 
-macro_rules! impl_math {
-    (@glam $ty:ident, $name:expr, $($idents:ident),* $(,)?) => {
+macro_rules! impl_simple {
+    (@non_generic $ty:ident, $name:expr, $($idents:ident),* $(,)?) => {
         impl_leaf_info_for!($ty, $name);
         impl Type for $ty {
             impl_type_methods!(Value);
@@ -312,7 +312,7 @@ macro_rules! impl_math {
         }
     };
 
-    (@geom $ty:path, $name:expr, $($idents:ident),* $(,)?) => {
+    (@generic $ty:path, $name:expr, $($idents:ident),* $(,)?) => {
         unsafe impl<T: Reflected + Type> Reflected for $ty {
             const TYPE_NAME: &'static str = $crate::__private::type_name::<Self>();
 
@@ -360,18 +360,20 @@ macro_rules! impl_math {
     };
 }
 
-impl_math!(@glam Vec3, "class Vector3D", x, y, z);
-impl_math!(@glam Vec3A, "class Vector3D", x, y, z);
+impl_simple!(@non_generic Vec3, "class Vector3D", x, y, z);
+impl_simple!(@non_generic Vec3A, "class Vector3D", x, y, z);
 
-impl_math!(@glam Mat3, "class Matrix3x3", x_axis, y_axis, z_axis);
-impl_math!(@glam Mat3A, "class Matrix3x3", x_axis, y_axis, z_axis);
+impl_simple!(@non_generic Mat3, "class Matrix3x3", x_axis, y_axis, z_axis);
+impl_simple!(@non_generic Mat3A, "class Matrix3x3", x_axis, y_axis, z_axis);
 
-impl_math!(@glam Quat, "class Quaternion", x, y, z, w);
+impl_simple!(@non_generic Quat, "class Quaternion", x, y, z, w);
 
-impl_math!(@geom Point<T>, "class Point", x, y);
-impl_math!(@geom Size<T>, "class Size", width, height);
-impl_math!(@geom Rect<T>, "class Rect", left, top, right, bottom);
-impl_math!(@glam Euler, "class Euler", pitch, yaw, roll); // TODO: Is this order correct?
+impl_simple!(@generic Point<T>, "class Point", x, y);
+impl_simple!(@generic Size<T>, "class Size", width, height);
+impl_simple!(@generic Rect<T>, "class Rect", left, top, right, bottom);
+impl_simple!(@non_generic Euler, "class Euler", pitch, yaw, roll); // TODO: Is this order correct?
+
+impl_simple!(@non_generic Color, "class Color", b, g, r, a);
 
 unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
     const TYPE_NAME: &'static str = T::TYPE_NAME;

@@ -4,6 +4,8 @@
 #![feature(optimize_attribute)]
 #![forbid(unsafe_code)]
 
+pub mod color;
+
 pub mod hash;
 
 /// Creates a bitmask spanning the `$numbits` least

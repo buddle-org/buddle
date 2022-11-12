@@ -9,10 +9,7 @@ use std::{
 
 use memmap2::{Mmap, MmapOptions};
 
-use crate::{
-    interner::{FileHandle, Interner},
-    types as wad_types,
-};
+use crate::types as wad_types;
 
 /// A read-only archive that is either memory-mapped or
 /// allocated in heap memory.

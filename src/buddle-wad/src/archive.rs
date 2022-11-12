@@ -55,6 +55,19 @@ impl Archive {
         MemoryMappedArchive::open(path, verify_crc).map(Self::MemoryMapped)
     }
 
+    /// Gets the number of files in the archive.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.journal().inner.len()
+    }
+
+    /// Whether the archive is empty, i.e. does not contain
+    /// any files.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     #[inline]
     pub(crate) fn journal(&self) -> &Journal {
         match self {
@@ -74,12 +87,16 @@ impl Archive {
     /// Gets the raw contents of an archived file by its
     /// encoded name string.
     ///
+    /// This returns a `(is_compressed, contents)` tuple
+    /// to give the user maximum flexibility about how
+    /// to process the results.
+    ///
     /// Returns [`None`] when no such file exists in the
     /// archive.
-    pub fn file_raw(&self, name: &str) -> Option<&[u8]> {
+    pub fn file_raw(&self, name: &str) -> Option<(bool, &[u8])> {
         self.journal()
             .find(name)
-            .map(|f| f.extract(self.raw_archive()))
+            .map(|f| (f.compressed, f.extract(self.raw_archive())))
     }
 }
 

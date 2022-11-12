@@ -4,6 +4,8 @@ pub mod archive;
 
 pub mod crc;
 
+pub mod interner;
+
 pub mod types;
 
 mod parse;

@@ -1,12 +1,13 @@
 //! Common types in the KIWAD format.
 
+use anyhow::bail;
 use binrw::{
     binread,
     io::{Read, Seek},
-    BinReaderExt, BinResult,
+    BinReaderExt,
 };
 
-use crate::parse::parse_file_name;
+use crate::{crc, parse::parse_file_name};
 
 /// The header of a WAD archive.
 #[binread]
@@ -48,6 +49,28 @@ pub struct File {
     pub name: String,
 }
 
+impl File {
+    /// Gets the size of the data described by this file.
+    pub fn size(&self) -> usize {
+        if self.compressed {
+            self.compressed_size as usize
+        } else {
+            self.uncompressed_size as usize
+        }
+    }
+
+    /// Extracts this file from the given raw archive bytes.
+    ///
+    /// This only returns a subslice spanning the unmodified
+    /// file contents without decompressing them.
+    pub fn extract<'a>(&self, raw_archive: &'a [u8]) -> &'a [u8] {
+        let offset = self.offset as usize;
+        let size = self.size();
+
+        &raw_archive[offset..offset + size]
+    }
+}
+
 /// Representation of a WAD archive.
 ///
 /// This does not account for the dynamically-sized data
@@ -67,7 +90,21 @@ pub struct Archive {
 }
 
 impl Archive {
-    pub fn parse<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
-        reader.read_le()
+    /// Parses the archive from a given reader.
+    pub fn parse<R: Read + Seek>(reader: &mut R) -> anyhow::Result<Self> {
+        reader.read_le().map_err(Into::into)
+    }
+
+    /// Verifies the CRC of every file in the archive given
+    /// the raw archive bytes.
+    pub fn verify_crcs(&self, raw_archive: &[u8]) -> anyhow::Result<()> {
+        self.files.iter().try_for_each(|f| {
+            let hash = crc::hash(f.extract(raw_archive));
+            if hash == f.crc {
+                Ok(())
+            } else {
+                bail!("CRC mismatch - expected {}, got {}", hash, f.crc);
+            }
+        })
     }
 }

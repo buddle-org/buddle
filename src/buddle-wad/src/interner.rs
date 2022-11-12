@@ -9,11 +9,21 @@ use crate::archive::Archive;
 /// A file handle which refers to an interned archive file
 /// in an [`Interner`].
 ///
-/// File handles are returned from interning a file and may
-/// be used to retrieve the same file at a later time.
+/// Handles can be used with [`Interner::fetch`] to retrieve
+/// the file contents associated with them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FileHandle(u32);
 
+/// Facilitates decompressing and accessing [`Archive`]
+/// files by assigning them [`FileHandle`]s.
+///
+/// Interning a file loads its **uncompressed** contents
+/// into an internal buffer and conveniently assigns it a
+/// [`FileHandle`] for later retrieval.
+///
+/// By design, handles can only be invalidated all at once.
+/// Specific invalidations per handle are not intended or
+/// supported.
 pub struct Interner {
     // A dynamically grown buffer which stores all decompressed
     // file data in it as a contagious stream of data.
@@ -91,7 +101,10 @@ impl Interner {
     /// obtained from [`Interner::intern`].
     ///
     /// The returned slice always contains decompressed file
-    /// data.
+    /// contents.
+    ///
+    /// Returns [`None`] if the mapping was previously
+    /// invalidated and not populated again.
     pub fn fetch(&self, handle: FileHandle) -> Option<&[u8]> {
         let idx = handle.0 as usize;
         self.starts.get(idx).map(|&start| {

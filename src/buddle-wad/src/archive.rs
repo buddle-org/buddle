@@ -1,5 +1,3 @@
-//! In-memory representations of WAD archives.
-
 use std::{
     collections::BTreeMap,
     fs::{self, File},

@@ -1,6 +1,3 @@
-//! Interner for efficiently handling decompression and
-//! access to files inside archives.
-
 use anyhow::{anyhow, bail};
 use flate2::{Decompress, FlushDecompress, Status};
 

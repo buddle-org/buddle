@@ -104,8 +104,6 @@ impl Interner {
     /// invalidated and not populated again.
     pub fn fetch(&self, handle: FileHandle) -> Option<&[u8]> {
         let idx = handle.0 as usize;
-
-        // this is only mapping over 1 thing (vale thinks this isn't weird but it is)
         self.ends.get(idx).map(|&end| {
             let start = self.ends.get(idx.wrapping_sub(1)).copied().unwrap_or(0);
             &self.buffer[start..end]

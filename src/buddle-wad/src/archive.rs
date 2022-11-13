@@ -17,7 +17,9 @@ use crate::types as wad_types;
 ///
 /// For smaller files, the heap backend should always be
 /// preferred over memory mappings.
-pub enum Archive {
+pub struct Archive(ArchiveInner);
+
+enum ArchiveInner {
     MemoryMapped(MemoryMappedArchive),
     Heap(HeapArchive),
 }
@@ -35,7 +37,7 @@ impl Archive {
     /// This is the preferred option of working with relatively
     /// small files but it's always best to profile.
     pub fn heap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        HeapArchive::open(path, verify_crc).map(Self::Heap)
+        HeapArchive::open(path, verify_crc).map(|heap_archive| Archive(ArchiveInner::Heap(heap_archive)))
     }
 
     /// Opens a file at the given `path` and maps it into
@@ -50,7 +52,9 @@ impl Archive {
     /// This is the preferred option of working with relatively
     /// large files but it's always best to profile.
     pub fn mmap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        MemoryMappedArchive::open(path, verify_crc).map(Self::MemoryMapped)
+        MemoryMappedArchive::open(path, verify_crc).map(
+            |memory_mapped_archive| Archive(ArchiveInner::MemoryMapped(memory_mapped_archive))
+        )
     }
 
     /// Gets the number of files in the archive.
@@ -68,17 +72,17 @@ impl Archive {
 
     #[inline]
     pub(crate) fn journal(&self) -> &Journal {
-        match self {
-            Self::MemoryMapped(a) => &a.journal,
-            Self::Heap(a) => &a.journal,
+        match &self.0 {
+            ArchiveInner::MemoryMapped(a) => &a.journal,
+            ArchiveInner::Heap(a) => &a.journal,
         }
     }
 
     #[inline]
     pub(crate) fn raw_archive(&self) -> &[u8] {
-        match self {
-            Self::MemoryMapped(a) => &a.mapping,
-            Self::Heap(a) => &a.data,
+        match &self.0 {
+            ArchiveInner::MemoryMapped(a) => &a.mapping,
+            ArchiveInner::Heap(a) => &a.data,
         }
     }
 
@@ -98,7 +102,7 @@ impl Archive {
     }
 }
 
-pub struct Journal {
+pub(crate) struct Journal {
     inner: BTreeMap<String, wad_types::File>,
 }
 
@@ -117,7 +121,7 @@ impl Journal {
     }
 }
 
-pub struct MemoryMappedArchive {
+struct MemoryMappedArchive {
     // We internally hold the file so it stays open for the
     // lifetime of the memory mapping.
     //
@@ -161,7 +165,7 @@ impl MemoryMappedArchive {
     }
 }
 
-pub struct HeapArchive {
+struct HeapArchive {
     journal: Journal,
     data: Vec<u8>,
 }

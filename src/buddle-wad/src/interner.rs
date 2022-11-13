@@ -26,11 +26,11 @@ pub struct Interner {
     // file data in it as a contagious stream of data.
     buffer: Vec<u8>,
 
-    // Stores the start offsets into `buffer` for every individual
+    // Stores the end offsets into `buffer` for every individual
     // file stream.
     //
     // We use indices into this list as the file access handles.
-    starts: Vec<usize>,
+    ends: Vec<usize>,
 
     // The zlib object for data decompression.
     decompress: Decompress,
@@ -41,7 +41,7 @@ impl Interner {
     pub fn new() -> Self {
         Self {
             buffer: Vec::new(),
-            starts: Vec::new(),
+            ends: Vec::new(),
             decompress: Decompress::new(true),
         }
     }
@@ -55,7 +55,7 @@ impl Interner {
     /// The memory allocations will be preserved.
     pub fn invalidate_all(&mut self) {
         self.buffer.clear();
-        self.starts.clear();
+        self.ends.clear();
     }
 
     /// Interns a file named `file` from the `archive`.
@@ -75,11 +75,11 @@ impl Interner {
 
         // Make a new, unique handle out of the index for
         // the metadata we are going to store for the file.
-        let handle = FileHandle(self.starts.len() as u32);
+        let handle = FileHandle(self.ends.len() as u32);
 
         // Remember where this file is starting in memory.
-        let file_start = self.buffer.len();
-        self.starts.push(file_start);
+        let file_start = self.ends.last().copied().unwrap_or(0);
+        self.ends.push(file_start + file.uncompressed_size as usize);
 
         let data = file.extract(raw_archive);
         if file.compressed {
@@ -104,13 +104,19 @@ impl Interner {
     /// invalidated and not populated again.
     pub fn fetch(&self, handle: FileHandle) -> Option<&[u8]> {
         let idx = handle.0 as usize;
-        self.starts.get(idx).map(|&start| {
-            let end = self
-                .starts
-                .get(idx + 1)
-                .copied()
-                .unwrap_or(self.buffer.len());
+        // self.starts.get(idx).map(|&start| {
+        //     let end = self
+        //         .starts
+        //         .get(idx + 1)
+        //         .copied()
+        //         .unwrap_or(self.buffer.len());
 
+        //     &self.buffer[start..end]
+        // })
+
+        // this is only mapping over 1 thing
+        self.ends.get(idx).map(|&end| {
+            let start = self.ends.get(idx.wrapping_sub(1)).copied().unwrap_or(0);
             &self.buffer[start..end]
         })
     }

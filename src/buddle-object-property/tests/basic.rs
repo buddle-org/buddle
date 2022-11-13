@@ -1,6 +1,7 @@
 use buddle_object_property::{
+    cpp::Ptr,
     type_info::{PropertyFlags, TypeInfo},
-    Enum, PropertyClass, PropertyClassExt, Type, cpp::Ptr,
+    Enum, PropertyClass, PropertyClassExt, Type,
 };
 
 #[test]

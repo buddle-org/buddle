@@ -37,7 +37,8 @@ impl Archive {
     /// This is the preferred option of working with relatively
     /// small files but it's always best to profile.
     pub fn heap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        HeapArchive::open(path, verify_crc).map(|heap_archive| Archive(ArchiveInner::Heap(heap_archive)))
+        HeapArchive::open(path, verify_crc)
+            .map(|heap_archive| Archive(ArchiveInner::Heap(heap_archive)))
     }
 
     /// Opens a file at the given `path` and maps it into
@@ -52,9 +53,8 @@ impl Archive {
     /// This is the preferred option of working with relatively
     /// large files but it's always best to profile.
     pub fn mmap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        MemoryMappedArchive::open(path, verify_crc).map(
-            |memory_mapped_archive| Archive(ArchiveInner::MemoryMapped(memory_mapped_archive))
-        )
+        MemoryMappedArchive::open(path, verify_crc)
+            .map(|memory_mapped_archive| Archive(ArchiveInner::MemoryMapped(memory_mapped_archive)))
     }
 
     /// Gets the number of files in the archive.

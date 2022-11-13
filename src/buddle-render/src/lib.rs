@@ -8,8 +8,8 @@ use std::marker::PhantomData;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
     window::Window,
+    window::WindowBuilder,
 };
 
 struct State<'win> {
@@ -26,7 +26,7 @@ impl<'win> State<'win> {
     /// Creates new state with default config
     ///
     /// # Safety
-    /// 
+    ///
     /// Must be called from main thread with a valid window handle
     pub async unsafe fn new(window: &'win Window) -> State<'win> {
         let size = window.inner_size();
@@ -36,28 +36,32 @@ impl<'win> State<'win> {
         let instance = wgpu::Instance::new(wgpu::Backends::all());
         // SAFETY: Must be called from main thread, window handle must be valid and must be valid for the lifetime of <surface>
         let surface = unsafe { instance.create_surface(window) };
-        let adapter = instance.request_adapter(
-            &wgpu::RequestAdapterOptions {
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
-            },
-        ).await.unwrap();
+            })
+            .await
+            .unwrap();
 
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                features: wgpu::Features::empty(),
-                // WebGL doesn't support all of wgpu's features, so if
-                // we're building for the web we'll have to disable some.
-                limits: if cfg!(target_arch = "wasm32") {
-                    wgpu::Limits::downlevel_webgl2_defaults()
-                } else {
-                    wgpu::Limits::default()
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    features: wgpu::Features::empty(),
+                    // WebGL doesn't support all of wgpu's features, so if
+                    // we're building for the web we'll have to disable some.
+                    limits: if cfg!(target_arch = "wasm32") {
+                        wgpu::Limits::downlevel_webgl2_defaults()
+                    } else {
+                        wgpu::Limits::default()
+                    },
+                    label: None,
                 },
-                label: None,
-            },
-            None, // Trace path
-        ).await.unwrap();
+                None, // Trace path
+            )
+            .await
+            .unwrap();
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -69,7 +73,7 @@ impl<'win> State<'win> {
         };
         surface.configure(&device, &config);
 
-        State{
+        State {
             surface,
             device,
             queue,
@@ -90,7 +94,6 @@ impl<'win> State<'win> {
         }
     }
 
-
     // fn input(&mut self, event: &WindowEvent) -> bool {
     //     todo!()
     // }
@@ -103,7 +106,6 @@ impl<'win> State<'win> {
     //     todo!()
     // }
 }
-
 
 pub fn run() {
     env_logger::init();
@@ -130,6 +132,3 @@ pub fn run() {
         _ => {}
     });
 }
-
-
-

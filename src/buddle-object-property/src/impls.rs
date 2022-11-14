@@ -185,7 +185,11 @@ macro_rules! impl_container {
         unsafe impl<T: Default + Reflected + Type> Reflected for $ty {
             const TYPE_NAME: &'static str = T::TYPE_NAME;
 
-            const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<$ty>(Some(Self::TYPE_NAME));
+            const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
+                type_name: Self::TYPE_NAME,
+                type_hash: T::TYPE_INFO.type_hash(),
+                type_id: TypeId::of::<$ty>(),
+            });
         }
 
         impl<T: Default + Reflected + Type> Type for $ty {

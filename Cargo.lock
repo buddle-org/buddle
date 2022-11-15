@@ -186,6 +186,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "buddle-ecs"
+version = "0.1.0"
+
+[[package]]
 name = "buddle-math"
 version = "0.1.0"
 dependencies = [

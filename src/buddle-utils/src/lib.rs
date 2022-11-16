@@ -4,6 +4,8 @@
 #![feature(optimize_attribute)]
 #![forbid(unsafe_code)]
 
+pub use tracing;
+
 pub mod color;
 
 pub mod hash;

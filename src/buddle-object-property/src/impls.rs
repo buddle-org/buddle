@@ -323,10 +323,10 @@ macro_rules! impl_simple {
             const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
                 type_name: Self::TYPE_NAME,
                 type_hash: StringIdBuilder::new()
-                    .feed($name)
-                    .feed("<")
-                    .feed(T::TYPE_NAME)
-                    .feed(">")
+                    .feed_str($name)
+                    .feed_str("<")
+                    .feed_str(T::TYPE_NAME)
+                    .feed_str(">")
                     .finish(),
                 type_id: TypeId::of::<Self>(),
             });
@@ -385,8 +385,8 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
     const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
         type_name: Self::TYPE_NAME,
         type_hash: StringIdBuilder::new()
-            .feed(Self::TYPE_NAME)
-            .feed("*")
+            .feed_str(Self::TYPE_NAME)
+            .feed_str("*")
             .finish(),
         type_id: TypeId::of::<Self>(),
     });
@@ -484,9 +484,9 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for SharedPtr<T> {
     const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
         type_name: Self::TYPE_NAME,
         type_hash: StringIdBuilder::new()
-            .feed("class SharedPointer<")
-            .feed(Self::TYPE_NAME)
-            .feed(">")
+            .feed_str("class SharedPointer<")
+            .feed_str(Self::TYPE_NAME)
+            .feed_str(">")
             .finish(),
         type_id: TypeId::of::<Self>(),
     });
@@ -586,9 +586,9 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for WeakPtr<T> {
     const TYPE_INFO: &'static TypeInfo = &TypeInfo::Leaf(ValueInfo {
         type_name: Self::TYPE_NAME,
         type_hash: StringIdBuilder::new()
-            .feed("class WeakPointer<")
-            .feed(Self::TYPE_NAME)
-            .feed(">")
+            .feed_str("class WeakPointer<")
+            .feed_str(Self::TYPE_NAME)
+            .feed_str(">")
             .finish(),
         type_id: TypeId::of::<Self>(),
     });

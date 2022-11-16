@@ -4,6 +4,7 @@ use std::{
 };
 
 /// A string type that stores its contents as raw bytes.
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct RawString(
     /// The raw byte string.
     pub Vec<u8>,
@@ -64,6 +65,7 @@ impl fmt::Display for RawString {
 }
 
 /// A wide string type that stores its contents as raw bytes.
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct RawWideString(
     /// The raw byte string.
     pub Vec<u16>,

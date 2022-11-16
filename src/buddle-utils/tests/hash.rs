@@ -11,10 +11,10 @@ fn test_string_id() {
     assert_eq!(string_id("class FishTournamentEntry"), 1725212200);
     assert_eq!(
         StringIdBuilder::new()
-            .feed("class ")
-            .feed("NonCombatMayCastSpellTemplate")
-            .feed("")
-            .feed("*")
+            .feed_str("class ")
+            .feed_str("NonCombatMayCastSpellTemplate")
+            .feed_str("")
+            .feed_str("*")
             .finish(),
         920052956
     );

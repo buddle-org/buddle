@@ -8,3 +8,6 @@ repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
+buddle-math = { path = "../buddle-math" }
+buddle-object-property = { path = "../buddle-object-property" }
+buddle-utils = { path = "../buddle-utils" }

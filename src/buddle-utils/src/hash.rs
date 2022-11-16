@@ -4,17 +4,14 @@
 use crate::bitmask;
 
 /// Produces a String ID of `data`.
-///
-/// This hash function is a custom design by KingsIsle.
-///
-/// Similar enough strings frequently produce collisions
-/// and it is not optimized for performance due to its
-/// use of shifts by non-constant values.
-///
-/// It is officially deprecated in favor of [`djb2`] in
-/// Pirate101.
 #[inline(always)]
 pub const fn string_id(data: &str) -> u32 {
+    StringIdBuilder::new().feed_str(data).finish()
+}
+
+/// Produces a String ID of `data`.
+#[inline(always)]
+pub const fn byte_string_id(data: &[u8]) -> u32 {
     StringIdBuilder::new().feed(data).finish()
 }
 
@@ -48,15 +45,13 @@ impl StringIdBuilder {
     // cases, this is not only a slowdown but also a
     // revolting source of binary overhead for no gain.
     #[optimize(size)]
-    pub const fn feed(mut self, data: &str) -> Self {
-        let bytes = data.as_bytes();
-
+    pub const fn feed(mut self, data: &[u8]) -> Self {
         // Iterate over all the bytes in the string.
         let mut i = 0;
-        while i < bytes.len() {
+        while i < data.len() {
             // Compute the current value to process and the
             // shift to use based on previous feed() calls.
-            let c = bytes[i] as i32 - 32;
+            let c = data[i] as i32 - 32;
             let shift = (self.byte_index + i as u32) * 5 % 32;
 
             // Perform the hashing operation.
@@ -73,6 +68,11 @@ impl StringIdBuilder {
         self.byte_index += i as u32;
 
         self
+    }
+
+    #[inline(always)]
+    pub const fn feed_str(self, data: &str) -> Self {
+        self.feed(data.as_bytes())
     }
 
     /// Consumes the builder and returns the final hash.

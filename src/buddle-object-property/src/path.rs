@@ -11,32 +11,32 @@ use crate::{Type, TypeMut, TypeRef};
 pub enum PathError<'p> {
     /// Occurs when resolution of a class property
     /// identifier at a specific depth failed.
-    #[error("Expected structure at depth {depth:?}")]
+    #[error("expected structure at depth {depth:?}")]
     ExpectedStructure { depth: usize },
     /// Occurs when resolution of a container index at
     /// a specific depth failed.
-    #[error("Expected container to index into at depth {depth:?}")]
+    #[error("expected container to index into at depth {depth:?}")]
     ExpectedContainer { depth: usize },
     /// A class does not have a property that matches the
     /// name of the identifier.
-    #[error("Value at depth {depth:?} does not have a field named {ident}")]
+    #[error("value at depth {depth:?} does not have a field named {ident}")]
     InvalidIdent { ident: &'p str, depth: usize },
     /// A container stores no element at the supplied index.
-    #[error("Container at depth {depth:?} has vacant index {index:?}")]
+    #[error("container at depth {depth:?} has vacant index {index:?}")]
     InvalidContainerIndex { index: usize, depth: usize },
     /// A generic lexer error for the supplied path string.
-    #[error("Path lexer failed at position {position:?}: {error}")]
+    #[error("path lexer failed at position {position:?}: {error}")]
     LexerFailed {
         error: &'static str,
         position: usize,
     },
     /// Identifier that was assumed to be a container index
     /// is not a number.
-    #[error("Failed to parse container index as usize: {0}")]
+    #[error("failed to parse container index as usize: {0}")]
     InvalidIndex(#[from] ParseIntError),
     /// A reflected value was attempted to be downcast into
     /// an incorrect concrete type.
-    #[error("Cannot downcast path element into incorrect type")]
+    #[error("cannot downcast path element into incorrect type")]
     InvalidDowncast,
 }
 

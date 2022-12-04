@@ -236,7 +236,7 @@ impl<M: Unmarshal, L: Layout, Ext: DeserializerExt> Deserializer<M, L, Ext> {
 
             Ok(object)
         } else {
-            Err(Error::custom("Empty root object serialized"))
+            Err(Error::custom("empty root object serialized"))
         }
     }
 

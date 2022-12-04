@@ -463,7 +463,7 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
             // Create the default instance of the type we're expecting.
             if let Err(e) = self.as_type_mut().set(identity.make_default()) {
                 return Err(serde::Error::custom(format_args!(
-                    "Failed to deserialize incompatible pointer type {}",
+                    "failed to deserialize incompatible pointer type {}",
                     e.type_info().type_name()
                 )));
             }

@@ -1,0 +1,15 @@
+[package]
+name = "buddle-net"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Implementation of the KingsIsle networking protocol"
+license = "GPL-2.0"
+repository = "https://github.com/buddle-org/buddle.git"
+edition = "2021"
+
+[dependencies]
+aes-gcm = "0.10"
+bytes = "1.3"
+chrono = "0.4"
+rsa = "0.7"
+tokio-util = { version = "0.7", features = ["codec"] }

@@ -1,0 +1,9 @@
+[package]
+name = "buddle-dml"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Implementation of the Data Management Layer for networking"
+license = "GPL-2.0"
+edition = "2021"
+
+[dependencies]

@@ -3,10 +3,10 @@ use std::{
     string::{FromUtf16Error, FromUtf8Error},
 };
 
-/// A string type that stores its contents as raw bytes.
+/// A string that stores raw bytes without encoding requirements.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct RawString(
-    /// The raw byte string.
+    /// The raw data.
     pub Vec<u8>,
 );
 
@@ -64,18 +64,12 @@ impl fmt::Display for RawString {
     }
 }
 
-/// A wide string type that stores its contents as raw bytes.
+/// A wide string that stores raw bytes without encoding requirements.
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct RawWideString(
-    /// The raw byte string.
+    /// The raw data.
     pub Vec<u16>,
 );
-
-impl From<RawWideString> for Vec<u16> {
-    fn from(s: RawWideString) -> Self {
-        s.0
-    }
-}
 
 impl From<&str> for RawWideString {
     fn from(s: &str) -> Self {
@@ -86,6 +80,12 @@ impl From<&str> for RawWideString {
 impl From<String> for RawWideString {
     fn from(s: String) -> Self {
         Self(s.encode_utf16().collect())
+    }
+}
+
+impl From<RawWideString> for Vec<u16> {
+    fn from(s: RawWideString) -> Self {
+        s.0
     }
 }
 
@@ -111,17 +111,17 @@ impl core::ops::DerefMut for RawWideString {
     }
 }
 
-impl fmt::Display for RawWideString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        display_utf16(&self.0, f, core::iter::once)
-    }
-}
-
 impl fmt::Debug for RawWideString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "RawWideString(\"")?;
         display_utf16(&self.0, f, char::escape_debug)?;
         write!(f, "\")")
+    }
+}
+
+impl fmt::Display for RawWideString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        display_utf16(&self.0, f, core::iter::once)
     }
 }
 

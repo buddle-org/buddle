@@ -1,59 +1,40 @@
-use std::{any::TypeId, collections::VecDeque, sync::Arc};
-
-use buddle_math::*;
-use buddle_utils::{color::Color, hash::StringIdBuilder};
-
-use crate::{
-    cpp::*,
-    serde::{self, de::DynDeserializer, ser::DynSerializer, Baton, IdentityType},
-    type_info::*,
-    Container, ContainerIter, PropertyClass, PropertyClassExt, Type, TypeMut, TypeOwned, TypeRef,
+use std::{
+    any::{Any, TypeId},
+    collections::VecDeque,
+    sync::Arc,
 };
 
-/// Implements the [`Reflected`][crate::type_info::Reflected]
-/// trait for custom types.
-///
-/// # Safety
-///
-/// This macro always produced info for **leaf types**, do
-/// not use it with [`PropertyClass`][crate::PropertyClass]es.
-#[macro_export]
+use anyhow::{anyhow, bail};
+use buddle_math::*;
+use buddle_utils::{bitint::*, color::Color, hash::StringIdBuilder};
+
+use crate::{
+    cpp::*, serde::*, type_info::*, Container, ContainerIter, PropertyClass, PropertyClassExt,
+    Type, TypeMut, TypeOwned, TypeRef,
+};
+
 macro_rules! impl_leaf_info_for {
     ($ty:ty) => {
-        // SAFETY: User is responsible for meeting the invariants.
-        unsafe impl $crate::type_info::Reflected for $ty {
+        // SAFETY: User is responsible for meeting invariants.
+        unsafe impl Reflected for $ty {
             const TYPE_NAME: &'static str = $crate::__private::type_name::<Self>();
 
-            const TYPE_INFO: &'static $crate::type_info::TypeInfo =
-                &$crate::type_info::TypeInfo::leaf::<$ty>(::std::option::Option::None);
+            const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<$ty>(None);
         }
     };
 
     ($ty:ty, $name:expr) => {
-        // SAFETY: User is responsible for meeting the invariants.
+        // SAFETY: User is responsible for meeting invariants.
         unsafe impl $crate::type_info::Reflected for $ty {
             const TYPE_NAME: &'static str = $name;
 
-            const TYPE_INFO: &'static $crate::type_info::TypeInfo =
-                &$crate::type_info::TypeInfo::leaf::<$ty>(::std::option::Option::Some($name));
+            const TYPE_INFO: &'static TypeInfo = &TypeInfo::leaf::<$ty>(Some($name));
         }
     };
 }
 
-/// Implements most of the [`Type`][crate::Type] methods
-/// in-place.
-///
-/// # Example
-///
-/// ```
-/// # use buddle_object_property::{impl_leaf_info_for, impl_type_methods, Type};
-/// struct Example;
-///
-/// impl Type for Example {
-///     impl_type_methods!(Value);
-/// }
-/// impl_leaf_info_for!(Example);
-/// ```
+/// Provides blanket implementations for most [`Type`] trait methods,
+/// except serialization.
 #[macro_export]
 macro_rules! impl_type_methods {
     ($kind:ident) => {
@@ -64,21 +45,6 @@ macro_rules! impl_type_methods {
 
         #[inline]
         fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any {
-            self
-        }
-
-        #[inline]
-        fn as_type(&self) -> &dyn $crate::Type {
-            self
-        }
-
-        #[inline]
-        fn as_type_mut(&mut self) -> &mut dyn $crate::Type {
-            self
-        }
-
-        #[inline]
-        fn as_boxed_type(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn $crate::Type> {
             self
         }
 
@@ -114,16 +80,12 @@ macro_rules! impl_primitive {
         impl Type for $ty {
             impl_type_methods!(Value);
 
-            fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
-                serializer.marshal().$ty(*self)
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
+                ser.writer().$ty(*self);
             }
 
-            fn deserialize(
-                &mut self,
-                deserializer: &mut dyn DynDeserializer,
-                _: Baton,
-            ) -> serde::Result<()> {
-                *self = deserializer.unmarshal().$ty()?;
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+                *self = de.reader().$ty()?;
                 Ok(())
             }
         }
@@ -148,16 +110,12 @@ impl_leaf_info_for!(RawString, "std::string");
 impl Type for RawString {
     impl_type_methods!(Value);
 
-    fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
-        serializer.marshal().str(&self.0)
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        ser.write_str(&self.0);
     }
 
-    fn deserialize(
-        &mut self,
-        deserializer: &mut dyn DynDeserializer,
-        _: Baton,
-    ) -> serde::Result<()> {
-        *self = deserializer.unmarshal().str().map(Self)?;
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        *self = de.read_str().map(Self)?;
         Ok(())
     }
 }
@@ -166,16 +124,12 @@ impl_leaf_info_for!(RawWideString, "std::wstring");
 impl Type for RawWideString {
     impl_type_methods!(Value);
 
-    fn serialize(&self, serializer: &mut dyn DynSerializer, _: Baton) -> serde::Result<()> {
-        serializer.marshal().wstr(&self.0)
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        ser.write_wstr(&self.0);
     }
 
-    fn deserialize(
-        &mut self,
-        deserializer: &mut dyn DynDeserializer,
-        _: Baton,
-    ) -> serde::Result<()> {
-        *self = deserializer.unmarshal().wstr().map(Self)?;
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        *self = de.read_wstr().map(Self)?;
         Ok(())
     }
 }
@@ -195,43 +149,26 @@ macro_rules! impl_container {
         impl<T: Default + Reflected + Type> Type for $ty {
             impl_type_methods!(Container);
 
-            fn serialize(
-                &self,
-                serializer: &mut dyn DynSerializer,
-                baton: Baton,
-            ) -> serde::Result<()> {
-                // Serialize the entire container.
-                serializer.container(self, baton)
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
+                for value in self {
+                    value.serialize(ser);
+                }
             }
 
-            fn deserialize(
-                &mut self,
-                deserializer: &mut dyn DynDeserializer,
-                baton: Baton,
-            ) -> serde::Result<()> {
-                // We want to get rid of all the elements to avoid mixup
-                // between what was serialized and what was already there.
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+                let len = de.deserialize_container_len()?;
+
                 self.clear();
+                self.reserve(len);
 
-                // Deserialize the entire container.
-                deserializer.container(
-                    &mut |visitor, baton| {
-                        let len = visitor.element_count().unwrap_or(0);
+                (0..len).try_for_each(|_| {
+                    let mut new = T::default();
 
-                        // Reserve sufficient space for the elements in advance.
-                        self.reserve(len);
+                    new.deserialize(de)?;
+                    <$ty>::$push(self, new);
 
-                        // Deserialize every individual element.
-                        for _ in 0..len {
-                            let mut element = T::default();
-                            visitor.next(&mut element, baton)?;
-                            <$ty>::$push(self, element);
-                        }
-
-                        Ok(())
-                    },
-                    baton,
-                )
+                    Ok(())
+                })
             }
         }
 
@@ -260,10 +197,6 @@ macro_rules! impl_container {
                 <$ty>::$pop(self).map(|e| Box::new(e) as Box<dyn Type>)
             }
 
-            fn clear(&mut self) {
-                <$ty>::clear(self);
-            }
-
             fn reserve(&mut self, capacity: usize) {
                 <$ty>::reserve(self, capacity);
             }
@@ -288,29 +221,16 @@ macro_rules! impl_simple {
         impl Type for $ty {
             impl_type_methods!(Value);
 
-            fn serialize(
-                &self,
-                serializer: &mut dyn DynSerializer,
-                b: Baton,
-            ) -> serde::Result<()> {
-                // XXX: Human-readable output?
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
                 $(
-                    self.$idents.serialize(serializer, b)?;
+                    self.$idents.serialize(ser);
                 )*
-
-                Ok(())
             }
 
-            fn deserialize(
-                &mut self,
-                deserializer: &mut dyn DynDeserializer,
-                b: Baton,
-            ) -> serde::Result<()> {
-                // XXX: Human-readable output?
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
                 $(
-                    self.$idents.deserialize(deserializer, b)?;
+                    self.$idents.deserialize(de)?;
                 )*
-
                 Ok(())
             }
         }
@@ -335,29 +255,16 @@ macro_rules! impl_simple {
         impl<T: Reflected + Type> Type for $ty {
             impl_type_methods!(Value);
 
-            fn serialize(
-                &self,
-                serializer: &mut dyn DynSerializer,
-                b: Baton,
-            ) -> serde::Result<()> {
-                // XXX: Human-readable output?
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
                 $(
-                    self.$idents.serialize(serializer, b)?;
+                    self.$idents.serialize(ser);
                 )*
-
-                Ok(())
             }
 
-            fn deserialize(
-                &mut self,
-                deserializer: &mut dyn DynDeserializer,
-                b: Baton,
-            ) -> serde::Result<()> {
-                // XXX: Human-readable output?
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
                 $(
-                    self.$idents.deserialize(deserializer, b)?;
+                    self.$idents.deserialize(de)?;
                 )*
-
                 Ok(())
             }
         }
@@ -379,6 +286,96 @@ impl_simple!(@non_generic Euler, "class Euler", pitch, yaw, roll); // TODO: Is t
 
 impl_simple!(@non_generic Color, "class Color", b, g, r, a);
 
+macro_rules! impl_bit_uint {
+    ($ty:ident, $name:expr, $raw:ident, $bits:expr) => {
+        impl_leaf_info_for!($ty, $name);
+        impl Type for $ty {
+            impl_type_methods!(Value);
+
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
+                ser.writer().write_bitint(<$raw>::from(*self), $bits);
+            }
+
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+                let value: $raw = de.reader().read_bitint($bits)?;
+                *self = Self::new(value);
+
+                Ok(())
+            }
+        }
+    };
+}
+
+macro_rules! impl_bit_int {
+    ($ty:ident, $name:expr, $uraw:ident, $raw:ident, $bits:expr) => {
+        impl_leaf_info_for!($ty, $name);
+        impl Type for $ty {
+            impl_type_methods!(Value);
+
+            fn serialize(&mut self, ser: &mut Serializer<'_>) {
+                ser.writer().write_bitint(<$raw>::from(*self), $bits);
+            }
+
+            fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+                let value: $uraw = de.reader().read_bitint($bits)?;
+                *self = Self::new(sign_extend!($raw, value, $bits));
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_leaf_info_for!(u1, "bui1");
+impl Type for u1 {
+    impl_type_methods!(Value);
+
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        const ZERO: u1 = u1::new(0);
+        ser.writer().bool(*self != ZERO);
+    }
+
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        let value = de.reader().read_bit()?;
+        *self = Self::new(value as u8);
+
+        Ok(())
+    }
+}
+
+impl_bit_uint!(u2, "bui2", u8, 2);
+impl_bit_uint!(u3, "bui3", u8, 3);
+impl_bit_uint!(u4, "bui4", u8, 4);
+impl_bit_uint!(u5, "bui5", u8, 5);
+impl_bit_uint!(u6, "bui6", u8, 6);
+impl_bit_uint!(u7, "bui7", u8, 7);
+impl_bit_uint!(u24, "u24", u32, 24);
+
+impl_leaf_info_for!(i1, "bi1");
+impl Type for i1 {
+    impl_type_methods!(Value);
+
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        const ZERO: i1 = i1::new(0);
+        ser.writer().bool(*self != ZERO);
+    }
+
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        let value = de.reader().read_bit()?;
+        *self = Self::new(sign_extend!(i8, value as u8, 1));
+
+        Ok(())
+    }
+}
+
+impl_bit_int!(i2, "bi2", u8, i8, 2);
+impl_bit_int!(i3, "bi3", u8, i8, 3);
+impl_bit_int!(i4, "bi4", u8, i8, 4);
+impl_bit_int!(i5, "bi5", u8, i8, 5);
+impl_bit_int!(i6, "bi6", u8, i8, 6);
+impl_bit_int!(i7, "bi7", u8, i8, 7);
+impl_bit_int!(i24, "s24", u32, i32, 24);
+
 unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
     const TYPE_NAME: &'static str = T::TYPE_NAME;
 
@@ -393,23 +390,11 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for Ptr<T> {
 }
 
 impl<T: Reflected + PropertyClass> Type for Ptr<T> {
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn as_type(&self) -> &dyn Type {
-        self
-    }
-
-    fn as_type_mut(&mut self) -> &mut dyn Type {
-        self
-    }
-
-    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 
@@ -427,52 +412,36 @@ impl<T: Reflected + PropertyClass> Type for Ptr<T> {
 
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
         match value.downcast::<Self>() {
+            // If `value` is another pointer, we can safely override it.
             Ok(value) => {
                 *self = *value;
                 Ok(())
             }
+
+            // Otherwise, check if `value` is a class type derived from `T`.
             Err(value) => match value.type_owned() {
                 TypeOwned::Class(c) if c.base_as::<T>().is_some() => {
                     self.value = Some(c);
                     Ok(())
                 }
-                x => Err(x.into_type()),
+
+                v => Err(v.into_type()),
             },
         }
     }
 
-    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
-        // First, serialize the identity of the object we have one.
-        let identity = self.value.as_ref().map(|v| v.property_list());
-        serializer.identity(identity, IdentityType::RawPtr, baton)?;
-
-        // When a value is also present, serialize it.
-        if let Some(value) = self.value.as_deref() {
-            serializer.class(value, baton)?;
-        }
-
-        Ok(())
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        ser.try_serialize(self.raw_mut());
     }
 
-    fn deserialize(
-        &mut self,
-        deserializer: &mut dyn DynDeserializer,
-        baton: Baton,
-    ) -> serde::Result<()> {
-        if let Some(identity) = deserializer.identity(IdentityType::RawPtr, baton)? {
-            // Create the default instance of the type we're expecting.
-            if let Err(e) = self.as_type_mut().set(identity.make_default()) {
-                return Err(serde::Error::custom(format_args!(
-                    "failed to deserialize incompatible pointer type {}",
-                    e.type_info().type_name()
-                )));
-            }
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        *self = match de.try_deserialize()? {
+            Some(v) => Self::try_new(v).map_err(|v| {
+                anyhow!("received incompatible type: {}", v.type_info().type_name())
+            })?,
 
-            // Deserialize the pointed-to value.
-            deserializer.class(self.value.as_deref_mut().unwrap(), baton)?;
-        } else {
-            self.value = None;
-        }
+            None => Self::null(),
+        };
 
         Ok(())
     }
@@ -493,23 +462,11 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for SharedPtr<T> {
 }
 
 impl<T: Reflected + PropertyClass> Type for SharedPtr<T> {
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn as_type(&self) -> &dyn Type {
-        self
-    }
-
-    fn as_type_mut(&mut self) -> &mut dyn Type {
-        self
-    }
-
-    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 
@@ -527,54 +484,32 @@ impl<T: Reflected + PropertyClass> Type for SharedPtr<T> {
 
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
         match value.downcast::<Self>() {
+            // If `value` is another pointer, we can safely override it.
             Ok(value) => {
                 *self = *value;
                 Ok(())
             }
+
+            // Otherwise, check if `value` is a class type derived from `T`.
             Err(value) => match value.type_owned() {
                 TypeOwned::Class(c) if c.base_as::<T>().is_some() => {
-                    self.value = Some(Arc::from(c));
+                    self.value = Arc::from(c);
                     Ok(())
                 }
-                x => Err(x.into_type()),
+
+                v => Err(v.into_type()),
             },
         }
     }
 
-    fn serialize(&self, serializer: &mut dyn DynSerializer, baton: Baton) -> serde::Result<()> {
-        // First, serialize the identity of the object we have one.
-        let identity = self.value.as_ref().map(|v| v.property_list());
-        serializer.identity(identity, IdentityType::RawPtr, baton)?;
-
-        // When a value is also present, serialize it.
-        if let Some(value) = self.value.as_deref() {
-            serializer.class(value, baton)?;
-        }
-
-        Ok(())
+    fn serialize(&mut self, ser: &mut Serializer<'_>) {
+        ser.try_serialize(self.raw_mut());
     }
 
-    fn deserialize(
-        &mut self,
-        deserializer: &mut dyn DynDeserializer,
-        baton: Baton,
-    ) -> serde::Result<()> {
-        if let Some(identity) = deserializer.identity(IdentityType::RawPtr, baton)? {
-            // Create the default instance of the type we're expecting.
-            if let Err(e) = self.as_type_mut().set(identity.make_default()) {
-                return Err(serde::Error::custom(format_args!(
-                    "Failed to deserialize incompatible pointer type {}",
-                    e.type_info().type_name()
-                )));
-            }
-
-            // Deserialize the pointed-to value.
-            // We previously just set the value, so we shouldn't
-            // have any borrowers which would make unwrap fail.
-            deserializer.class(self.value.as_mut().and_then(Arc::get_mut).unwrap(), baton)?;
-        } else {
-            self.value = None;
-        }
+    fn deserialize(&mut self, de: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        let value = de.deserialize()?;
+        *self = Self::try_new(Arc::from(value))
+            .map_err(|v| anyhow!("received incompatible type: {}", v.type_info().type_name()))?;
 
         Ok(())
     }
@@ -595,23 +530,11 @@ unsafe impl<T: Reflected + PropertyClass> Reflected for WeakPtr<T> {
 }
 
 impl<T: Reflected + PropertyClass> Type for WeakPtr<T> {
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-
-    fn as_type(&self) -> &dyn Type {
-        self
-    }
-
-    fn as_type_mut(&mut self) -> &mut dyn Type {
-        self
-    }
-
-    fn as_boxed_type(self: Box<Self>) -> Box<dyn Type> {
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 
@@ -630,5 +553,13 @@ impl<T: Reflected + PropertyClass> Type for WeakPtr<T> {
     fn set(&mut self, value: Box<dyn Type>) -> Result<(), Box<dyn Type>> {
         *self = *value.downcast()?;
         Ok(())
+    }
+
+    fn serialize(&mut self, _: &mut Serializer<'_>) {
+        // Serialization is unsupported, so we do nothing.
+    }
+
+    fn deserialize(&mut self, _: &mut Deserializer<'_>) -> anyhow::Result<()> {
+        bail!("Deserialization of weak pointers is not supported");
     }
 }

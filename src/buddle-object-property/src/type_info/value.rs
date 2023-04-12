@@ -2,15 +2,13 @@ use std::any::{type_name, TypeId};
 
 use buddle_utils::hash::string_id;
 
-use crate::Type;
+use crate::r#type::Type;
 
-/// [`TypeInfo`] for leaf types.
+/// [`TypeInfo`][super::TypeInfo] for leaf types.
 ///
-/// Leaf types in the *ObjectProperty* system are those
-/// that are not `PropertyClass`es and therefore do not
-/// provide nested access to child.
-///
-/// [`TypeInfo`]: super::TypeInfo
+/// Leaf types in the *ObjectProperty* system are those that are not
+/// `PropertyClass`es and therefore do not provide nested access to
+/// children.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ValueInfo {
     pub(crate) type_name: &'static str,

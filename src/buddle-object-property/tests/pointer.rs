@@ -3,13 +3,13 @@ use buddle_object_property::Type;
 
 #[test]
 fn test_cast() {
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     struct Another {
         #[property()]
         test: Ptr<Test>,
     }
 
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     struct Test {
         #[property()]
         another: u32,
@@ -24,13 +24,13 @@ fn test_cast() {
 
 #[test]
 fn test_vec() {
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     struct Another {
         #[property()]
         data: Vec<u32>,
     }
 
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     struct Test {
         #[property()]
         test: Vec<Ptr<Another>>,

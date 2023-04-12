@@ -7,7 +7,7 @@ use bitflags::bitflags;
 use buddle_utils::hash::djb2;
 
 use super::PropertyList;
-use crate::{type_info::TypeInfo, PropertyClass, Type};
+use crate::{r#type::Type, type_info::TypeInfo};
 
 bitflags! {
     /// The configuration bits for [`Property`] values.
@@ -39,9 +39,8 @@ bitflags! {
 
 /// Description of a property in a [`PropertyClass`].
 ///
-/// Properties, being reflected fields of Rust structs,
-/// have the following details exposed for reflective
-/// access:
+/// Properties, being reflected fields of Rust structs, have the following
+/// details exposed for reflective access:
 ///
 /// - their unique name in the class compound
 ///
@@ -62,23 +61,20 @@ pub struct Property {
 }
 
 impl Property {
-    /// Creates a new property description from the
-    /// relevant details.
+    /// Creates a new [`Property`] from its metadata.
     ///
     /// # Safety
     ///
-    /// - `T` must be the actual Rust type of the property
-    ///   in the struct.
+    /// - `T` must be the actual Rust type of the property in the struct.
     ///
-    /// - `offset` must be a valid and `T`-aligned offset
-    ///   into the containing class struct of the property.
+    /// - `offset` must be a valid and `T`-aligned offset into the containing
+    ///   Rust struct of the property.
     ///
-    ///   This involves accounting for the lack of layout
-    ///   stability guarantees in repr(Rust) types.
+    ///   This involves accounting for the lack of layout stability guarantees
+    ///   in repr(Rust) types.
     ///
-    /// - `name` must be chosen so that [`Property::hash`]
-    ///   does not clash with other property hashes in
-    ///   that class.
+    /// - `name` must be chosen so that [`Property::hash`] does not clash with
+    ///   other properties in the containing Rust struct.
     pub const unsafe fn new<T: Type>(
         name: &'static str,
         flags: PropertyFlags,
@@ -86,13 +82,11 @@ impl Property {
         type_info: &'static TypeInfo,
         offset: usize,
     ) -> Self {
-        let base_info = if base {
-            match type_info {
-                TypeInfo::Class(list) => Some(list),
-                _ => unreachable!(),
-            }
-        } else {
-            None
+        let base_info = match (base, type_info) {
+            (true, TypeInfo::Class(list)) => Some(list),
+            (false, _) => None,
+
+            _ => unreachable!(),
         };
 
         Self {
@@ -108,126 +102,96 @@ impl Property {
         }
     }
 
-    /// Creates a special base class property.
-    ///
-    /// # Safety
-    ///
-    /// The same conditions as for [`Property::new`] apply.
-    #[allow(unsafe_op_in_unsafe_fn)]
-    pub const unsafe fn new_base<T: PropertyClass>(
-        type_info: &'static TypeInfo,
-        offset: usize,
-    ) -> Self {
-        // SAFETY: Caller upholds the invariants.
-        Self::new::<T>("super", PropertyFlags::empty(), true, type_info, offset)
-    }
-
     /// Gets the name of the property.
-    #[inline]
     pub const fn name(&self) -> &'static str {
         self.name
     }
 
     /// Gets the dictionary hash of the property.
     ///
-    /// The resulting value can be assumed to uniquely
-    /// reference a property in its property class.
-    #[inline]
+    /// The resulting value can be assumed to uniquely reference a property
+    /// within the same type.
     pub const fn hash(&self) -> u32 {
         self.hash
     }
 
     /// Gets the [`PropertyFlags`] for the property.
-    #[inline]
     pub const fn flags(&self) -> PropertyFlags {
         self.flags
     }
 
-    /// Indicates whether this property is the base class
-    /// of its containing type.
-    #[inline]
+    /// Indicates whether this property represents the base class of its
+    /// containing type.
     pub const fn is_base(&self) -> bool {
         self.base_info.is_some()
     }
 
     /// Gets the [`TypeInfo`] for the property's type.
-    #[inline]
     pub const fn type_info(&self) -> &'static TypeInfo {
         self.type_info
     }
 
-    /// Gets the [`PropertyList`] for the base type of the
-    /// containing class, if the property represents one.
-    #[inline]
+    /// Gets the [`PropertyList`] for the base type of the containing class,
+    /// if the property represents one.
     pub const fn base_list(&self) -> Option<&'static PropertyList> {
         self.base_info
     }
 
-    /// Gets an immutable reference to the property's value,
-    /// given a pointer to its containing object.
+    /// Gets an immutable reference to the property's value, given a pointer
+    /// to its containing object.
     ///
     /// # Safety
     ///
-    /// Unless you have a specific reason against it, prefer
+    /// Unless you have a particular reason against it, prefer
     /// [`PropertyClass::property`] for accessing values.
     ///
-    /// - `obj` must point to an initialized and aligned
-    ///   instance of the object that contains this
-    ///   [`Property`] value.
+    /// - `obj` must point to an initialized and aligned instance of the object
+    ///   that contains this [`Property`] value.
     ///
-    /// - The object behind `obj` must not be mutably borrowed
-    ///   when this method is called, to the point where the
-    ///   returned reference will be dropped.
+    /// - The object behind `obj` must not be mutably borrowed when this method
+    ///   is called, to the point where the returned reference will be dropped.
     ///
-    /// - `'t` must be inferred to not outlive the value
-    ///   behind `obj`.
-    #[inline]
+    /// - `'t` must be inferred to not outlive the value behind `obj`.
     pub unsafe fn value<'t>(&self, obj: *const ()) -> &'t dyn Type {
         // Compute a pointer to the property's value.
         let value: *const dyn Type = ptr::from_raw_parts(
             // SAFETY: We require that `obj` is valid in this context.
             unsafe { obj.byte_add(self.offset) },
-            // SAFETY: `Property::new` uses the property's type to
-            // infer correct metadata.
+            // SAFETY: `Property::new` by invariant uses the correct type
+            // to extract the metadata for.
             self.meta,
         );
 
-        // SAFETY: Since we require that no mutable reference
-        // exists, we can safely dereference the pointer.
+        // SAFETY: We require that `obj` is valid and not mutably aliased.
         unsafe { &*value }
     }
 
-    /// Gets an mutable reference to the property's value,
-    /// given a pointer to its containing object.
+    /// Gets a mutable reference to the property's value, given a pointer to its
+    /// containing object.
     ///
     /// # Safety
     ///
-    /// Unless you have a specific reason against it, prefer
+    /// Unless you have a particular reason against it, prefer
     /// [`PropertyClass::property_mut`] for accessing values.
     ///
-    /// - `obj` must point to an initialized and aligned
-    ///   instance of the object that contains this
-    ///   [`Property`] value.
+    /// - `obj` must point to an initialized and aligned instance of the object
+    ///   that contains this [`Property`] value.
     ///
-    /// - The object behind `obj` must not be borrowed at all
-    ///   when this method is called, to the point where the
-    ///   returned reference will be dropped.
+    /// - The object behind `obj` must not be borrowed when this method is called,
+    ///   to the point where the returned reference will be dropped.
     ///
-    /// - `'t` must be inferred to not outlive the value
-    ///   behind `obj`.
-    #[inline]
+    /// - `'t` must be inferred to not outlive the value behind `obj`.
     pub unsafe fn value_mut<'t>(&self, obj: *mut ()) -> &'t mut dyn Type {
         // Compute a pointer to the property's value.
         let value: *mut dyn Type = ptr::from_raw_parts_mut(
             // SAFETY: We require that `obj` is valid in this context.
             unsafe { obj.byte_add(self.offset) },
-            // SAFETY: `Property::new` uses the property's type to
-            // infer correct metadata.
+            // SAFETY: `Property::new` by invariant uses the correct type
+            // to extract the metadata for.
             self.meta,
         );
 
-        // SAFETY: Since we require that no borrows exist,
-        // we can safely dereference the pointer.
+        // SAFETY: We require that `obj` is valid and not borrowed.
         unsafe { &mut *value }
     }
 
@@ -239,8 +203,8 @@ impl Property {
     }
 }
 
-/// A guard that only grants access to a [`Property`] to
-/// the type that actually contains it.
+/// A guard that only grants access to a [`Property`] to the type that actually
+/// contains it.
 #[derive(Clone, Copy, Debug)]
 pub struct PropertyAccess<'a> {
     value: &'a Property,
@@ -256,8 +220,8 @@ impl<'a> PropertyAccess<'a> {
 
     /// Gets the dictionary hash of the property.
     ///
-    /// The resulting value can be assumed to uniquely
-    /// reference a property in its property class.
+    /// The resulting value can be assumed to uniquely reference a
+    /// property within the same type.
     #[inline]
     pub const fn hash(&self) -> u32 {
         self.value.hash()
@@ -274,12 +238,10 @@ impl<'a> PropertyAccess<'a> {
         self.value.type_info()
     }
 
-    /// Consumes the view and grants access to the wrapped
-    /// [`Property`] value.
+    /// Consumes the view and grants access to the wrapped [`Property`] value.
     ///
-    /// As stated in the documentation of [`PropertyAccess`],
-    /// this will only return [`Some`] when `T` is the
-    /// containing class type of the property.
+    /// As stated in the documentation of [`PropertyAccess`], this will only
+    /// return [`Some`] when `T` is the containing type of the property.
     #[inline]
     pub fn value(self, type_id: TypeId) -> Option<&'a Property> {
         (self.parent == type_id).then_some(self.value)

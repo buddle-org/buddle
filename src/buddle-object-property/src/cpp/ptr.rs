@@ -3,101 +3,92 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{PropertyClass, PropertyClassExt};
+use crate::{PropertyClass, PropertyClassExt, Type};
 
-/// A simulated C++ pointer which can be serialized.
+/// A nullable, owned pointer to heap [`PropertyClass`] objects.
 ///
-/// A `Ptr<T>` can hold any [`PropertyClass`] value
-/// where `T` is a base of the actual stored type.
+/// A [`Ptr`]`<T>` can hold any [`PropertyClass`] value where `T`
+/// is a base type of the actual stored type.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Ptr<T> {
-    // Invariant: Must be derived from `T`.
+    // Invariant: Must be derived from `T` or `None`.
     pub(crate) value: Option<Box<dyn PropertyClass>>,
+
     _t: PhantomData<Box<T>>,
 }
 
 impl<T: PropertyClass> Ptr<T> {
-    /// Creates a new pointer to the given `value`.
+    /// Creates a new pointer to a given type-erased [`PropertyClass`].
     ///
-    /// If `value` is not derived from `T`, this
-    /// will return [`None`].
-    pub fn try_new(value: Box<dyn PropertyClass>) -> Option<Self> {
+    /// Returns [`None`] if `value` is not derived from `T`.
+    pub fn try_new(value: Box<dyn PropertyClass>) -> Result<Self, Box<dyn PropertyClass>> {
+        // Invariant is met since `value` can be upcasted to `T`.
         if value.base_as::<T>().is_some() {
-            Some(Self {
+            Ok(Self {
                 value: Some(value),
                 _t: PhantomData,
             })
         } else {
-            None
+            Err(value)
         }
     }
 
-    /// Creates a new pointer to the given `value`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `value` is not derived from `T`.
-    pub fn new(value: Box<dyn PropertyClass>) -> Self {
-        Self::try_new(value).unwrap()
-    }
-
-    /// Creates a new pointer initialized to null.
+    /// Creates a new [`Ptr`] which does not point to a value.
     pub const fn null() -> Self {
+        // Invariant is met since we don't have a value.
         Self {
             value: None,
             _t: PhantomData,
         }
     }
 
-    /// Whether the pointer is null, i.e. does not
-    /// point to any value.
+    /// Checks if this is a null pointer, i.e. doesn't point to a value.
     pub const fn is_null(&self) -> bool {
         self.value.is_none()
     }
 
-    /// Gets the raw value of the stored object.
-    pub fn get_raw(&self) -> Option<&dyn PropertyClass> {
+    /// Gets an immutable reference to the raw value of the stored object.
+    pub fn raw(&self) -> Option<&dyn PropertyClass> {
         self.value.as_deref()
     }
 
-    /// Gets the inner value as a `T` reference,
-    /// if the pointer is non-null.
-    #[inline]
+    /// Gets a mutable reference to the raw value of the stored object.
+    pub fn raw_mut(&mut self) -> Option<&mut dyn PropertyClass> {
+        self.value.as_deref_mut()
+    }
+
+    /// Gets an immutable reference to the stored value upcasted to the `T`
+    /// base type.
     pub fn get(&self) -> Option<&T> {
-        self.value.as_ref().map(|p| p.base_as::<T>().unwrap())
+        self.value.as_ref().map(|v| unsafe {
+            // SAFETY: By type invariant, this can never fail.
+            v.base_as::<T>().unwrap_unchecked()
+        })
     }
 
-    /// Gets the inner value as a mutable `T`
-    /// reference, if the pointer is non-null.
-    #[inline]
+    /// Gets a mutable reference to the stored value upcasted to the `T`
+    /// base type.
     pub fn get_mut(&mut self) -> Option<&mut T> {
-        self.value.as_mut().map(|p| p.base_as_mut::<T>().unwrap())
+        self.value.as_mut().map(|v| unsafe {
+            // SAFETY: By type invariant, this can never fail.
+            v.base_as_mut::<T>().unwrap_unchecked()
+        })
     }
 
-    /// Gets the inner value downcasted to `U`,
-    /// if that's the actual pointer type.
-    ///
-    /// If the pointer is null or `U` does not
-    /// match the stored type, [`None`] will be
-    /// returned.
-    pub fn get_downcast<U: PropertyClass>(&self) -> Option<&U> {
-        self.value.as_ref().and_then(|p| p.as_type().downcast_ref())
+    /// Gets the inner value downcasted to `U`, if that matches the type.
+    pub fn downcast<U: PropertyClass>(&self) -> Option<&U> {
+        self.raw().and_then(|v| (v as &dyn Type).downcast_ref())
     }
 
-    /// Gets the inner value downcasted to `U`,
-    /// if that's the actual pointer type.
-    ///
-    /// If the pointer is null or `U` does not
-    /// match the stored type, [`None`] will be
-    /// returned.
-    pub fn get_downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
-        self.value
-            .as_mut()
-            .and_then(|p| p.as_type_mut().downcast_mut())
+    /// Gets the inner value downcasted to `U`, if that matches the type.
+    pub fn downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
+        self.raw_mut()
+            .and_then(|v| (v as &mut dyn Type).downcast_mut())
     }
 }
 
-// TODO: Clone, Copy, Debug traits?
+// TODO: Clone, Copy traits?
 
 impl<T: PropertyClass> Default for Ptr<T> {
     fn default() -> Self {
@@ -105,166 +96,109 @@ impl<T: PropertyClass> Default for Ptr<T> {
     }
 }
 
-/// A simulated C++ shared pointer which can be
-/// serialized.
+/// A simulated C++ shared pointer which can be serialized.
 ///
-/// This has the reference counting semantics of
-/// Rust's [`Arc`] type.
+/// This has the reference counting semantics of Rust's [`Arc`] type.
 ///
-/// A `SharedPtr<T>` can hold any [`PropertyClass`] value
-/// where `T` is a base of the actual stored type.
+/// A [`SharedPtr`]`<T>` can hold any [`PropertyClass`] value where
+/// `T` is a base type of the actual stored type.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct SharedPtr<T> {
     // Invariant: Must be derived from `T`.
-    pub(crate) value: Option<Arc<dyn PropertyClass>>,
-    _t: PhantomData<Box<T>>,
+    pub(crate) value: Arc<dyn PropertyClass>,
+
+    _t: PhantomData<Arc<T>>,
 }
 
 impl<T: PropertyClass> SharedPtr<T> {
-    /// Creates a new pointer to the given `value`.
+    /// Creates a new pointer to a given type-erased [`PropertyClass`].
     ///
-    /// If `value` is not derived from `T`, this
-    /// will return [`None`].
-    pub fn try_new(value: Arc<dyn PropertyClass>) -> Option<Self> {
+    /// Returns [`None`] if `value` is not derived from `T`.
+    pub fn try_new(value: Arc<dyn PropertyClass>) -> Result<Self, Arc<dyn PropertyClass>> {
+        // Invariant is met since `value` can be upcasted to `T`.
         if value.base_as::<T>().is_some() {
-            Some(Self {
-                value: Some(value),
+            Ok(Self {
+                value,
                 _t: PhantomData,
             })
         } else {
-            None
-        }
-    }
-
-    /// Creates a new pointer to the given `value`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `value` is not derived from `T`.
-    pub fn new(value: Arc<dyn PropertyClass>) -> Self {
-        Self::try_new(value).unwrap()
-    }
-
-    /// Creates a new pointer initialized to null.
-    pub const fn null() -> Self {
-        Self {
-            value: None,
-            _t: PhantomData,
+            Err(value)
         }
     }
 
     /// Downgrades the pointer into a [`WeakPtr`].
     ///
-    /// The resulting pointer is not strongly reference
-    /// counted and needs to be upgraded back into a
-    /// [`SharedPtr`] to access its value.
+    /// The resulting pointer is not strongly reference-counted and needs
+    /// to be upgraded back into a [`SharedPtr`] to access its value.
     pub fn downgrade(&self) -> WeakPtr<T> {
+        // Invariant is met since `self.value` is already checked.
         WeakPtr {
-            value: self.value.as_ref().map(Arc::downgrade),
+            value: Arc::downgrade(&self.value),
             _t: PhantomData,
         }
     }
 
-    /// Whether the pointer is null, i.e. does not
-    /// point to any value.
-    pub const fn is_null(&self) -> bool {
-        self.value.is_none()
+    /// Gets an immutable reference to the raw value of the stored object.
+    pub fn raw(&self) -> &dyn PropertyClass {
+        &*self.value
     }
 
-    /// Gets the raw value of the stored object.
-    pub fn get_raw(&self) -> Option<&dyn PropertyClass> {
-        self.value.as_deref()
+    /// Gets a mutable reference to the raw value of the stored object.
+    pub fn raw_mut(&mut self) -> Option<&mut dyn PropertyClass> {
+        Arc::get_mut(&mut self.value)
     }
 
-    /// Gets the inner value as a `T` reference,
-    /// if the pointer is non-null.
-    #[inline]
-    pub fn get(&self) -> Option<&T> {
-        self.value.as_ref().map(|p| p.base_as::<T>().unwrap())
+    /// Gets an immutable reference to the stored value upcasted to the `T`
+    /// base type.
+    pub fn get(&self) -> &T {
+        // SAFETY: By type invariant, this can never fail.
+        unsafe { self.value.base_as::<T>().unwrap_unchecked() }
     }
 
-    /// Gets the inner value as a mutable `T`
-    /// reference, if the pointer is non-null.
-    ///
-    /// If other mutable borrows of the pointer
-    /// exist, this method will return [`None`].
-    #[inline]
+    /// Gets a mutable reference to the stored value upcasted to the `T`
+    /// base type.
     pub fn get_mut(&mut self) -> Option<&mut T> {
-        self.value
-            .as_mut()
-            .and_then(|p| Arc::get_mut(p)?.base_as_mut::<T>())
+        Arc::get_mut(&mut self.value).map(|v| unsafe {
+            // SAFETY: By type invariant, this can never fail.
+            v.base_as_mut::<T>().unwrap_unchecked()
+        })
     }
 
-    /// Gets the inner value downcasted to `U`,
-    /// if that's the actual pointer type.
-    ///
-    /// If the pointer is null or `U` does not
-    /// match the stored type, [`None`] will be
-    /// returned.
-    pub fn get_downcast<U: PropertyClass>(&self) -> Option<&U> {
-        self.value.as_ref().and_then(|p| p.as_type().downcast_ref())
+    /// Gets the inner value downcasted to `U`, if that matches the type.
+    pub fn downcast<U: PropertyClass>(&self) -> Option<&U> {
+        (self.raw() as &dyn Type).downcast_ref()
     }
 
-    /// Gets the inner value downcasted to `U`,
-    /// if that's the actual pointer type.
-    ///
-    /// If other mutable borrows of the pointer
-    /// exist, this method will return [`None`].
-    ///
-    /// If the pointer is null or `U` does not
-    /// match the stored type, [`None`] will be
-    /// returned.
-    pub fn get_downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
-        self.value
-            .as_mut()
-            .and_then(|p| Arc::get_mut(p)?.as_type_mut().downcast_mut())
+    /// Gets the inner value downcasted to `U`, if that matches the type.
+    pub fn downcast_mut<U: PropertyClass>(&mut self) -> Option<&mut U> {
+        self.raw_mut()
+            .and_then(|v| (v as &mut dyn Type).downcast_mut())
     }
 }
 
-// TODO: Clone, Copy, Debug traits?
+// TODO: Clone, Copy traits?
 
-impl<T: PropertyClass> Default for SharedPtr<T> {
-    fn default() -> Self {
-        Self::null()
-    }
-}
-
-/// A simulated C++ weak pointer which can be
-/// serialized.
-///
-/// This has the reference counting semantics of
-/// Rust's [`Weak`] type.
-///
-/// A `WeakPtr<T>` can hold any [`PropertyClass`] value
-/// where `T` is a base of the actual stored type.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct WeakPtr<T> {
     // Invariant: Must be derived from `T`.
-    pub(crate) value: Option<Weak<dyn PropertyClass>>,
-    _t: PhantomData<Box<T>>,
+    pub(crate) value: Weak<dyn PropertyClass>,
+
+    _t: PhantomData<Weak<T>>,
 }
 
 impl<T: PropertyClass> WeakPtr<T> {
-    /// Upgrades the weak pointer into a [`SharedPtr`],
-    /// if any strong references are still alive.
+    /// Upgrades the weak pointer to a [`SharedPtr`], if any strong
+    /// references are still alive.
     ///
-    /// This operation returns [`Some`] if the pointer
-    /// value was null or if strong references were
-    /// still intact.
+    /// This operation returns [`Some`] if the pointer value was null
+    /// or if strong references were still intact.
     pub fn upgrade(&self) -> Option<SharedPtr<T>> {
-        self.value
-            .as_ref()
-            .and_then(|value| {
-                Some(SharedPtr {
-                    value: Some(value.upgrade()?),
-                    _t: PhantomData,
-                })
-            })
-            .or_else(|| {
-                Some(SharedPtr {
-                    value: None,
-                    _t: PhantomData,
-                })
-            })
+        // Invariant is met since `self.value` is already checked.
+        self.value.upgrade().map(|value| SharedPtr {
+            value,
+            _t: PhantomData,
+        })
     }
 }

@@ -1,5 +1,5 @@
 mod list;
-pub use self::list::*;
+pub use list::*;
 
 mod property;
-pub use self::property::*;
+pub use property::*;

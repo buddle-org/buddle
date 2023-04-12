@@ -9,9 +9,6 @@
 #![deny(rust_2018_idioms, rustdoc::broken_intra_doc_links)]
 #![forbid(unsafe_code)]
 
-#[macro_use]
-extern crate quote;
-
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 

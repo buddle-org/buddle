@@ -189,6 +189,11 @@ fn parse_property_attr<'a>(attrs: &mut Attrs<'a>, attr: &'a Attribute) -> Result
     }
     let property = attrs.property.as_mut().unwrap();
 
+    // Allow the `#[property]` notation to be accepted.
+    if attr.tokens.is_empty() {
+        return Ok(());
+    }
+
     attr.parse_args_with(|input: ParseStream<'_>| {
         let mut first = true;
         while !input.is_empty() {

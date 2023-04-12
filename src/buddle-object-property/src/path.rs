@@ -1,48 +1,12 @@
 //! Recursive access to nested values in reflected types.
 
-use std::{iter::Peekable, num::ParseIntError, str::Chars};
-
-use thiserror::Error;
+use std::{iter::Peekable, str::Chars};
 
 use crate::{Type, TypeMut, TypeRef};
 
-/// Errors that may occur during path resolution via [`PathAccess`].
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
-pub enum PathError<'p> {
-    /// Occurs when resolution of a class property
-    /// identifier at a specific depth failed.
-    #[error("expected structure at depth {depth:?}")]
-    ExpectedStructure { depth: usize },
-    /// Occurs when resolution of a container index at
-    /// a specific depth failed.
-    #[error("expected container to index into at depth {depth:?}")]
-    ExpectedContainer { depth: usize },
-    /// A class does not have a property that matches the
-    /// name of the identifier.
-    #[error("value at depth {depth:?} does not have a field named {ident}")]
-    InvalidIdent { ident: &'p str, depth: usize },
-    /// A container stores no element at the supplied index.
-    #[error("container at depth {depth:?} has vacant index {index:?}")]
-    InvalidContainerIndex { index: usize, depth: usize },
-    /// A generic lexer error for the supplied path string.
-    #[error("path lexer failed at position {position:?}: {error}")]
-    LexerFailed {
-        error: &'static str,
-        position: usize,
-    },
-    /// Identifier that was assumed to be a container index
-    /// is not a number.
-    #[error("failed to parse container index as usize: {0}")]
-    InvalidIndex(#[from] ParseIntError),
-    /// A reflected value was attempted to be downcast into
-    /// an incorrect concrete type.
-    #[error("cannot downcast path element into incorrect type")]
-    InvalidDowncast,
-}
-
 /// Dynamic access into nested data structures by paths.
 ///
-/// Paths are strings in the form of `"container[1].melement"`
+/// Paths are strings in the form of `"container[1].my_element"`
 /// to access the `my_element` property of the object stored
 /// at index `1` of container `my_container`.
 ///
@@ -51,29 +15,33 @@ pub enum PathError<'p> {
 pub trait PathAccess: Type {
     /// Attempts to resolve a given path into this value
     /// and returns an immutable reference on success.
-    fn path<'p>(&self, path: &'p str) -> Result<&dyn Type, PathError<'p>>;
+    fn path(&self, path: &str) -> anyhow::Result<&dyn Type>;
 
     /// Attempts to resolve a given path into this value
     /// and returns a mutable reference on success.
-    fn path_mut<'p>(&mut self, path: &'p str) -> Result<&mut dyn Type, PathError<'p>>;
+    fn path_mut(&mut self, path: &str) -> anyhow::Result<&mut dyn Type>;
 
     /// Resolves a path with [`PathAccess::path`] and attempts
     /// to downcast into a concrete type.
-    fn path_as<'p, T: Type>(&self, path: &'p str) -> Result<&T, PathError<'p>> {
-        self.path(path)
-            .and_then(|p| p.downcast_ref().ok_or(PathError::InvalidDowncast))
+    fn path_as<T: Type>(&self, path: &str) -> anyhow::Result<&T> {
+        self.path(path).and_then(|p| {
+            p.downcast_ref()
+                .ok_or_else(|| anyhow::anyhow!("cannot downcast path element into incorrect type"))
+        })
     }
 
     /// Resolves a path with [`PathAccess::path_mut`] and
     /// attempts to downcast into a concrete type.
-    fn path_as_mut<'p, T: Type>(&mut self, path: &'p str) -> Result<&mut T, PathError<'p>> {
-        self.path_mut(path)
-            .and_then(|p| p.downcast_mut().ok_or(PathError::InvalidDowncast))
+    fn path_as_mut<T: Type>(&mut self, path: &str) -> anyhow::Result<&mut T> {
+        self.path_mut(path).and_then(|p| {
+            p.downcast_mut()
+                .ok_or_else(|| anyhow::anyhow!("cannot downcast path element into incorrect type"))
+        })
     }
 }
 
 impl PathAccess for dyn Type {
-    fn path<'p>(&self, path: &'p str) -> Result<&dyn Type, PathError<'p>> {
+    fn path(&self, path: &str) -> anyhow::Result<&dyn Type> {
         let mut start = true;
         let mut current = self;
         let mut depth = 0;
@@ -86,10 +54,7 @@ impl PathAccess for dyn Type {
                         current = access_field(current, ident, depth)?;
                         depth += 1;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "'.' must be followed by a struct field ident",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("'.' must be followed by an identifier at {:?}", lexer.pos);
                     }
                 }
 
@@ -97,27 +62,18 @@ impl PathAccess for dyn Type {
                     if let Some(Token::Ident(ident)) = lexer.next() {
                         current = access_container(current, ident, depth)?;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "'[' must be followed by an identifier",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("'[' must be followed by an identifier at {:?}", lexer.pos);
                     }
 
                     if lexer.next() != Some(Token::RBracket) {
-                        return Err(PathError::LexerFailed {
-                            error: "expected token ']'",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("expected token ']' at {:?}", lexer.pos);
                     }
 
                     depth += 1;
                 }
 
                 Token::RBracket => {
-                    return Err(PathError::LexerFailed {
-                        error: "unexpected token ']' encountered",
-                        position: lexer.pos,
-                    })
+                    anyhow::bail!("unexpected token ']' encountered at {:?}", lexer.pos);
                 }
 
                 Token::Ident(ident) => {
@@ -125,10 +81,7 @@ impl PathAccess for dyn Type {
                         current = access_field(current, ident, depth)?;
                         depth += 1;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "expected '.' or '[' before ident",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("expected '.' or '[' before ident at {:?}", lexer.pos);
                     }
                 }
 
@@ -143,7 +96,7 @@ impl PathAccess for dyn Type {
         Ok(current)
     }
 
-    fn path_mut<'p>(&mut self, path: &'p str) -> Result<&mut dyn Type, PathError<'p>> {
+    fn path_mut(&mut self, path: &str) -> anyhow::Result<&mut dyn Type> {
         let mut start = true;
         let mut current = self;
         let mut depth = 0;
@@ -156,10 +109,7 @@ impl PathAccess for dyn Type {
                         current = access_field_mut(current, ident, depth)?;
                         depth += 1;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "'.' must be followed by a struct field ident",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("'.' must be followed by an identifier at {:?}", lexer.pos);
                     }
                 }
 
@@ -167,27 +117,18 @@ impl PathAccess for dyn Type {
                     if let Some(Token::Ident(ident)) = lexer.next() {
                         current = access_container_mut(current, ident, depth)?;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "'[' must be followed by an identifier",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("'[' must be followed by an identifier at {:?}", lexer.pos);
                     }
 
                     if lexer.next() != Some(Token::RBracket) {
-                        return Err(PathError::LexerFailed {
-                            error: "expected token ']'",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("expected token ']' at {:?}", lexer.pos);
                     }
 
                     depth += 1;
                 }
 
                 Token::RBracket => {
-                    return Err(PathError::LexerFailed {
-                        error: "unexpected token ']' encountered",
-                        position: lexer.pos,
-                    })
+                    anyhow::bail!("unexpected token ']' encountered at {:?}", lexer.pos);
                 }
 
                 Token::Ident(ident) => {
@@ -195,10 +136,7 @@ impl PathAccess for dyn Type {
                         current = access_field_mut(current, ident, depth)?;
                         depth += 1;
                     } else {
-                        return Err(PathError::LexerFailed {
-                            error: "expected '.' or '[' before ident",
-                            position: lexer.pos,
-                        });
+                        anyhow::bail!("expected '.' or '[' before ident at {:?}", lexer.pos);
                     }
                 }
 
@@ -215,77 +153,81 @@ impl PathAccess for dyn Type {
 }
 
 impl<T: Type> PathAccess for T {
-    fn path<'p>(&self, path: &'p str) -> Result<&dyn Type, PathError<'p>> {
+    fn path(&self, path: &str) -> anyhow::Result<&dyn Type> {
         <dyn Type>::path(self, path)
     }
 
-    fn path_mut<'p>(&mut self, path: &'p str) -> Result<&mut dyn Type, PathError<'p>> {
+    fn path_mut(&mut self, path: &str) -> anyhow::Result<&mut dyn Type> {
         <dyn Type>::path_mut(self, path)
     }
 }
 
-fn access_field<'p, 't>(
+fn access_field<'t>(
     value: &'t dyn Type,
-    ident: &'p str,
+    ident: &str,
     depth: usize,
-) -> Result<&'t dyn Type, PathError<'p>> {
+) -> anyhow::Result<&'t dyn Type> {
     let cls = match value.type_ref() {
         TypeRef::Class(value) => value,
-        _ => return Err(PathError::ExpectedStructure { depth }),
+        _ => anyhow::bail!("expected structure at depth {depth:?}"),
     };
 
     let list = cls.property_list();
     list.property(ident)
-        .and_then(|view| cls.property(view))
-        .ok_or(PathError::InvalidIdent { ident, depth })
+        .map(|view| cls.property(view))
+        .ok_or_else(|| {
+            anyhow::anyhow!("value at depth {depth:?} does not have a field named {ident}")
+        })
 }
 
-fn access_field_mut<'p, 't>(
+fn access_field_mut<'t>(
     value: &'t mut dyn Type,
-    ident: &'p str,
+    ident: &str,
     depth: usize,
-) -> Result<&'t mut dyn Type, PathError<'p>> {
+) -> anyhow::Result<&'t mut dyn Type> {
     let cls = match value.type_mut() {
         TypeMut::Class(value) => value,
-        _ => return Err(PathError::ExpectedStructure { depth }),
+        _ => anyhow::bail!("expected structure at depth {depth:?}"),
     };
 
     let list = cls.property_list();
     list.property(ident)
-        .and_then(|view| cls.property_mut(view))
-        .ok_or(PathError::InvalidIdent { ident, depth })
+        .map(|view| cls.property_mut(view))
+        .ok_or_else(|| {
+            anyhow::anyhow!("value at depth {depth:?} does not have a field named {ident}")
+        })
 }
 
-fn access_container<'p, 't>(
+fn access_container<'t>(
     value: &'t dyn Type,
-    index: &'p str,
+    index: &str,
     depth: usize,
-) -> Result<&'t dyn Type, PathError<'p>> {
+) -> anyhow::Result<&'t dyn Type> {
     let container = match value.type_ref() {
         TypeRef::Container(value) => value,
-        _ => return Err(PathError::ExpectedContainer { depth }),
+        _ => anyhow::bail!("expected container to index into at depth {depth:?}"),
     };
 
     let index = index.parse()?;
     container
         .get(index)
-        .ok_or(PathError::InvalidContainerIndex { index, depth })
+        .ok_or_else(|| anyhow::anyhow!("container at depth {depth:?} has vacant index {index:?}"))
 }
 
-fn access_container_mut<'p, 't>(
+fn access_container_mut<'t>(
     value: &'t mut dyn Type,
-    index: &'p str,
+    index: &str,
     depth: usize,
-) -> Result<&'t mut dyn Type, PathError<'p>> {
+) -> anyhow::Result<&'t mut dyn Type> {
     let container = match value.type_mut() {
         TypeMut::Container(value) => value,
-        _ => return Err(PathError::ExpectedContainer { depth }),
+        _ => anyhow::bail!("expected container to index into at depth {depth:?}"),
     };
 
     let index = index.parse()?;
     container
         .get_mut(index)
-        .ok_or(PathError::InvalidContainerIndex { index, depth })
+        .ok_or_else(|| anyhow::anyhow!("container at depth {depth:?} has vacant index {index:?}"))
 }
 
 #[derive(Debug, PartialEq)]

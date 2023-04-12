@@ -1,14 +1,13 @@
 use buddle_object_property::{
-    cpp::Ptr,
     type_info::{PropertyFlags, TypeInfo},
     Enum, PropertyClass, PropertyClassExt, Type,
 };
 
 #[test]
 fn basic_reflection() {
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     pub struct Foo {
-        #[property()]
+        #[property]
         a: u32,
         #[property(name = "c")]
         b: i32,
@@ -19,24 +18,26 @@ fn basic_reflection() {
 
     assert!(x.base().is_none());
 
-    let a_access = list.property("a").unwrap();
-    let a = x.property(a_access).unwrap();
+    let a = list
+        .property("a")
+        .map(|view| x.property(view))
+        .unwrap();
     assert!(a.is::<u32>());
     assert_eq!(a.downcast_ref(), Some(&7_u32));
 
-    let b_access = list.property("c").unwrap();
-    assert_eq!(x.property_as::<i32>(b_access), Some(&-5));
-    x.property_mut(b_access).unwrap().set(Box::new(-6_i32)).ok();
-    assert_eq!(x.property_as::<i32>(b_access), Some(&-6));
+    let b = list.property("c").unwrap();
+    assert_eq!(x.property_as::<i32>(b), Some(&-5));
+    x.property_mut(b).set(Box::new(-6_i32)).ok();
+    assert_eq!(x.property_as::<i32>(b), Some(&-6));
 }
 
 #[test]
 fn custom_type_info() {
     const U32: TypeInfo = TypeInfo::leaf::<u32>(Some("u32"));
 
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     pub struct Foo {
-        #[property()]
+        #[property]
         a: u32,
         #[property(info = &U32)]
         b: u32,
@@ -57,18 +58,18 @@ fn custom_type_info() {
 
 #[test]
 fn fake_inheritance() {
-    #[derive(Clone, Copy, Default, Type)]
+    #[derive(Clone, Copy, Debug, Default, Type)]
     pub struct A {
         test: u32,
     }
 
-    #[derive(Clone, Copy, Default, Type)]
+    #[derive(Clone, Copy, Debug, Default, Type)]
     pub struct B {
         #[property(base)]
         base: A,
     }
 
-    #[derive(Clone, Copy, Default, Type)]
+    #[derive(Clone, Copy, Debug, Default, Type)]
     pub struct C {
         #[property(base)]
         base: B,
@@ -89,11 +90,11 @@ fn fake_inheritance() {
 
 #[test]
 fn property_flags() {
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     pub struct Foo {
         #[property(flags(PUBLIC | COPY))]
         a: u32,
-        #[property()]
+        #[property]
         b: u32,
     }
 
@@ -112,7 +113,7 @@ fn property_flags() {
 
 #[test]
 fn object_name() {
-    #[derive(Default, Type)]
+    #[derive(Debug, Default, Type)]
     #[object(name = "Bar")]
     pub struct Foo {}
 
@@ -128,15 +129,9 @@ fn enum_reflection() {
         B = 2,
     }
 
-    assert_eq!(Foo::from_variant("A"), Some(Foo::A));
-    assert_eq!(Foo::B.value(), 2);
-}
+    let mut foo = Foo::B;
+    assert!(foo.update_variant("A"));
 
-#[test]
-fn test_ptr() {
-    #[derive(Default, Type)]
-    pub struct Foo {
-        #[property()]
-        a: Ptr<Foo>,
-    }
+    assert_eq!(foo, Foo::A);
+    assert_eq!(Foo::B.value(), 2);
 }

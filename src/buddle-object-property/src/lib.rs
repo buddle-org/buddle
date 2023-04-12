@@ -7,7 +7,6 @@
 //! [Richard Lyle]: https://github.com/rlyle
 //! [Medusa]: https://github.com/palestar/medusa
 
-#![allow(incomplete_features)]
 #![deny(
     rust_2018_idioms,
     rustdoc::broken_intra_doc_links,
@@ -26,8 +25,8 @@
     pointer_byte_offsets,
     ptr_metadata,
 
-    // Coercion of `dyn PropertyClass` to `dyn Type`.
-    trait_upcasting
+    // Calling `dyn Type` methods through `dyn PropertyClass`.
+    trait_upcasting,
 )]
 
 #[doc(inline)]
@@ -57,6 +56,7 @@ pub use self::r#type::*;
 
 #[doc(hidden)]
 pub mod __private {
+    pub use anyhow::Result;
     pub use bitflags::bitflags;
 
     /// Wrapper around [`std::any::type_name`] for codegen.
@@ -67,42 +67,38 @@ pub mod __private {
         std::any::type_name::<T>()
     }
 
-    /// Computes the offset to a struct field for
-    /// pointer access.
+    // Computes the offset to a struct field for pointer access.
     pub macro offset_of($ty:path, $field:ident) {{
-        // Allocate an uninitialized `$ty` and get a pointer
-        // to its designated storage.
-        //
-        // This pointer must never be dereferenced.
-        let uninit = ::std::mem::MaybeUninit::<$ty>::uninit();
-        let parent = uninit.as_ptr();
-
         // This protects against deref coercion by statically
         // enforcing that `$field` is an actual field in `$ty`.
         #[allow(clippy::unneeded_field_pattern)]
         let $ty { $field: _, .. };
 
-        // Craft a pointer to `$field` without creating a
-        // reference to the uninitialized `uninit`.
+        // Allocate an uninitialized `$ty` and get a pointer to
+        // its storage.
         //
-        // The resulting `child` pointer will inherit `parent`'s
-        // provenance which is required for subsequent pointer
-        // arithmetic operations.
+        // This pointer must never be dereferenced.
+        let uninit = ::std::mem::MaybeUninit::<$ty>::uninit();
+        let parent = uninit.as_ptr();
+
+        // Craft a pointer to `$field` without dereferencing
+        // the pointer to uninitialized memory.
         #[allow(unused_unsafe)] // Macro may be used in unsafe block.
         let child = unsafe { ::std::ptr::addr_of!((*parent).$field) };
 
         // Finally compute the offset from `parent` to `child`.
         //
         // The pointers share the same provenance and are in bounds
-        // of the same allocated object (see deref coercion above).
+        // of the same allocated object (see deref coercion guard).
         //
         // Further, subtracting `parent` from `child` will always
-        // produce a non-negative value.
+        // produce a non-negative offset into `parent`.
         #[allow(unused_unsafe)] // Macro may be used in unsafe block.
         unsafe {
-            let offset = child.cast::<u8>().offset_from(parent.cast::<u8>());
-            debug_assert!(offset >= 0);
-            offset as usize
+            let parent = parent.cast::<u8>();
+            let child = child.cast::<u8>();
+
+            child.offset_from(parent) as usize
         }
     }}
 }

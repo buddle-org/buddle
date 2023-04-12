@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{
     parse::{Parse, ParseStream, Result},
     punctuated::Punctuated,
@@ -8,14 +9,14 @@ use syn::{
 use crate::utils::default_crate_path;
 
 pub struct Input {
-    pub krate: Option<Path>,
-    pub item: Bits,
+    krate: Option<Path>,
+    item: Bits,
 }
 
 impl Parse for Input {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let krate = if input.peek(Token![#]) && input.peek2(Token![!]) {
-            // #![crate = buddle_object_property]
+            // #![crate = kronos_object_property]
 
             input.parse::<Token![#]>()?;
             input.parse::<Token![!]>()?;
@@ -31,51 +32,51 @@ impl Parse for Input {
             None
         };
 
-        Ok(Input {
+        Ok(Self {
             krate,
             item: input.parse()?,
         })
     }
 }
 
-pub struct Bits {
-    pub attrs: Vec<syn::Attribute>,
-    pub vis: syn::Visibility,
-    pub ident: syn::Ident,
-    pub flags: Punctuated<Flag, Token![;]>,
+struct Bits {
+    attrs: Vec<syn::Attribute>,
+    vis: syn::Visibility,
+    ident: syn::Ident,
+    flags: Punctuated<Flag, Token![;]>,
 }
 
 impl Parse for Bits {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let attrs = input.call(syn::Attribute::parse_outer)?;
+
         let vis = input.parse()?;
         input.parse::<Token![struct]>()?;
         let ident = input.parse()?;
 
         let content;
         syn::braced!(content in input);
-        let flags = content.parse_terminated(Flag::parse)?;
 
         Ok(Self {
             attrs,
             vis,
             ident,
-            flags,
+            flags: content.parse_terminated(Flag::parse)?,
         })
     }
 }
 
-pub struct Flag {
-    pub attrs: Vec<syn::Attribute>,
-    pub ident: syn::Ident,
-    pub value: syn::Expr,
+struct Flag {
+    attrs: Vec<syn::Attribute>,
+    ident: syn::Ident,
+    value: syn::Expr,
 }
 
 impl Parse for Flag {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let attrs = input.call(syn::Attribute::parse_outer)?;
 
-        input.parse::<syn::Visibility>()?; // We tolerate explicit visibility.
+        input.parse::<syn::Visibility>()?;
         input.parse::<Token![const]>()?;
 
         let ident = input.parse()?;
@@ -119,10 +120,8 @@ pub fn expand(input: Input) -> Result<TokenStream> {
         }
 
         // SAFETY: Enums are always leaf types by nature.
-        // We capture the correct type the derive macro was
-        // used on and go with the default Rust type name.
         unsafe impl #path::type_info::Reflected for #ty {
-            const TYPE_NAME: &'static str = Self::TYPE_INFO.type_name();
+            const TYPE_NAME: &'static ::std::primitive::str = Self::TYPE_INFO.type_name();
 
             const TYPE_INFO: &'static #path::type_info::TypeInfo =
                 &#path::type_info::TypeInfo::leaf::<#ty>(
@@ -131,69 +130,19 @@ pub fn expand(input: Input) -> Result<TokenStream> {
         }
 
         impl #path::Type for #ty {
-            #[inline]
-            fn as_any(&self) -> &dyn ::std::any::Any {
-                self
-            }
+            #path::impl_type_methods!(Enum);
 
             #[inline]
-            fn as_any_mut(&mut self) -> &mut dyn ::std::any::Any {
-                self
+            fn serialize(&mut self, ser: &mut #path::serde::Serializer<'_>) {
+                ser.serialize_enum(self);
             }
 
             #[inline]
-            fn as_type(&self) -> &dyn #path::Type {
-                self
-            }
-
-            #[inline]
-            fn as_type_mut(&mut self) -> &mut dyn #path::Type {
-                self
-            }
-
-            #[inline]
-            fn as_boxed_type(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn #path::Type> {
-                self
-            }
-
-            #[inline]
-            fn type_ref(&self) -> #path::TypeRef<'_> {
-                #path::TypeRef::Enum(self)
-            }
-
-            #[inline]
-            fn type_mut(&mut self) -> #path::TypeMut<'_> {
-                #path::TypeMut::Enum(self)
-            }
-
-            #[inline]
-            fn type_owned(self: ::std::boxed::Box<Self>) -> #path::TypeOwned {
-                #path::TypeOwned::Enum(self)
-            }
-
-            #[inline]
-            fn set(
-                &mut self,
-                value: ::std::boxed::Box<dyn #path::Type>,
-            ) -> ::std::result::Result<(), ::std::boxed::Box<dyn #path::Type>> {
-                *self = *value.downcast()?;
-                ::std::result::Result::Ok(())
-            }
-
-            fn serialize(
-                &self,
-                serializer: &mut dyn #path::serde::ser::DynSerializer,
-                baton: #path::serde::Baton,
-            ) -> #path::serde::Result<()> {
-                serializer.enum_variant(self, baton)
-            }
-
             fn deserialize(
                 &mut self,
-                deserializer: &mut dyn #path::serde::de::DynDeserializer,
-                baton: #path::serde::Baton,
-            ) -> #path::serde::Result<()> {
-                deserializer.enum_variant(self, baton)
+                de: &mut #path::serde::Deserializer<'_>,
+            ) -> #path::__private::Result<()> {
+                de.deserialize_enum(self)
             }
         }
 
@@ -201,7 +150,7 @@ pub fn expand(input: Input) -> Result<TokenStream> {
             fn variant(&self) -> ::std::borrow::Cow<'static, ::std::primitive::str> {
                 use ::std::fmt::Write;
 
-                let mut out = String::new();
+                let mut out = ::std::string::String::new();
                 ::std::write!(&mut out, "{:?}", self).unwrap();
 
                 ::std::borrow::Cow::Owned(out)
@@ -211,52 +160,31 @@ pub fn expand(input: Input) -> Result<TokenStream> {
                 &mut self,
                 variant: &::std::primitive::str,
             ) -> ::std::primitive::bool {
-                if let ::std::option::Option::Some(value) = Self::from_variant(variant) {
-                    *self = value;
-                    true
-                } else {
-                    false
-                }
-            }
-
-            fn from_variant(variant: &::std::primitive::str) -> ::std::option::Option<Self>
-            where
-                Self: ::std::marker::Sized
-            {
-                let mut flags = Self::empty();
-
+                let mut new = Self::empty();
                 for bit in variant.split('|').map(|b| b.trim()) {
                     match bit {
-                        #(#bit_names => flags |= #ty::#bit_idents,)*
+                        #(#bit_names => new |= #ty::#bit_idents,)*
 
-                        _ => return ::std::option::Option::None,
+                        _ => return false,
                     }
                 }
 
-                ::std::option::Option::Some(flags)
+                *self = new;
+                true
             }
 
             fn value(&self) -> ::std::primitive::u32 {
                 Self::bits(self)
             }
 
-            fn update_value(
-                &mut self,
-                value: ::std::primitive::u32,
-            ) -> ::std::primitive::bool {
-                if let ::std::option::Option::Some(value) = Self::from_value(value) {
-                    *self = value;
-                    true
-                } else {
-                    false
-                }
-            }
+            fn update_value(&mut self, value: ::std::primitive::u32) -> ::std::primitive::bool {
+                *self = match Self::from_bits(value) {
+                    ::std::option::Option::Some(v) => v,
 
-            fn from_value(value: ::std::primitive::u32) -> ::std::option::Option<Self>
-            where
-                Self: ::std::marker::Sized
-            {
-                Self::from_bits(value)
+                    _ => return false,
+                };
+
+                true
             }
         }
     })

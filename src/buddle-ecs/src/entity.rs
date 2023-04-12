@@ -14,7 +14,7 @@ use buddle_utils::hash::byte_string_id;
 ///
 /// [Medusa]: https://github.com/palestar/medusa
 /// [`Noun`]: https://github.com/palestar/medusa/blob/develop/World/Noun.h
-#[derive(Default, Type)]
+#[derive(Debug, Default, Type)]
 #[object(name = "class CoreObject")]
 pub struct CoreObject {
     #[property(
@@ -81,7 +81,7 @@ pub struct CoreObject {
 ///
 /// As such, a [`BehaviorTemplate`] is directly convertible
 /// into [`BehaviorInstance`] for type construction.
-#[derive(Clone, Default, Type)]
+#[derive(Clone, Debug, Default, Type)]
 #[object(name = "class BehaviorTemplate")]
 pub struct BehaviorTemplate {
     /// The name of the behavior.
@@ -97,7 +97,7 @@ pub struct BehaviorTemplate {
 /// itself, but also a list of behavior templates to
 /// create the behaviors that should be attached.
 /// [`BehaviorTemplate`]
-#[derive(Default, Type)]
+#[derive(Debug, Default, Type)]
 #[object(name = "class CoreTemplate")]
 pub struct CoreTemplate {
     /// The [`BehaviorTemplate`]s for the type.
@@ -118,7 +118,7 @@ pub struct CoreTemplate {
 ///
 /// [Medusa]: https://github.com/palestar/medusa
 /// [`Trait`]: https://github.com/palestar/medusa/blob/develop/World/Trait.h
-#[derive(Default, Type)]
+#[derive(Debug, Default, Type)]
 #[object(name = "class BehaviorInstance")]
 pub struct BehaviorInstance {
     /// The string ID of the associated [`BehaviorTemplate`]

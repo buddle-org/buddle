@@ -9,11 +9,13 @@ bitenum! {
 }
 
 #[test]
-fn simple_reflect() {
-    let flags = Flags::A | Flags::C;
+fn bit_reflect() {
+    let mut flags = Flags::A | Flags::C;
 
     assert_eq!(flags.variant(), "A | C");
     assert_eq!(flags.value(), 0b101);
-    assert_eq!(Flags::from_variant("A | C"), Some(flags));
-    assert_eq!(Flags::from_value(0b101), Some(flags));
+
+    flags.update_variant("A | B");
+    assert_eq!(flags.variant(), "A | B");
+    assert_eq!(flags.value(), 0b11);
 }

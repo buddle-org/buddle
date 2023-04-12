@@ -1,3 +1,4 @@
+use quote::quote;
 use syn::{
     Data, DataEnum, DataStruct, DeriveInput, Error, Expr, Generics, Ident, Member, Path, Result,
     Type,
@@ -43,6 +44,18 @@ pub struct Field<'a> {
     pub attrs: Attrs<'a>,
     pub ident: Ident,
     pub ty: &'a Type,
+}
+
+impl Field<'_> {
+    pub fn is_base(&self) -> bool {
+        // If this field has a `#[property(base)]` attribute configured,
+        // it holds the base class of the containing type.
+        self.attrs
+            .property
+            .as_ref()
+            .map(|p| p.base)
+            .unwrap_or(false)
+    }
 }
 
 pub struct Enum<'a> {

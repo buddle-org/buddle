@@ -2,15 +2,21 @@
 name = "buddle-object-property"
 version = "0.1.0"
 authors = ["Valentin B. <valentin.be@protonmail.com>"]
-description = "Implementation of the ObjectProperty reflection and serialization system"
+description = "Runtime reflection and serialization for Rust"
 license = "GPL-2.0"
-repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
-buddle-object-property-macros = { path = "macros" }
+buddle-bit-buf = { path = "../buddle-bit-buf" }
 buddle-math = { path = "../buddle-math" }
+buddle-object-property-macros = { path = "macros" }
 buddle-utils = { path = "../buddle-utils" }
 
+anyhow = "1.0"
 bitflags = "1.3"
-thiserror = "1.0"
+byteorder = "1.4"
+flate2 = { version = "1.0", default-features = false }
+
+[features]
+default = ["flate2/miniz_oxide"]
+zlib-simd = ["flate2/zlib-ng-compat"]

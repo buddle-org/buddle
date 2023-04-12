@@ -1,49 +1,43 @@
-//! Statically constructible type information for reflected
-//! Rust types.
+//! Statically embeddable type information for reflected Rust types.
 
 use std::any::TypeId;
 
-use crate::Type;
+use crate::r#type::Type;
 
 mod class;
-pub use self::class::*;
+pub use class::*;
 
 mod value;
-pub use self::value::*;
+pub use value::*;
 
 /// Statically accessible [`TypeInfo`] for reflected types.
 ///
 /// # Safety
 ///
-/// `TYPE_INFO` must be an accurate description of the type
-/// this trait is implemented for to avoid memory corruption
-/// (and obvious semantic breakage).
+/// Implementors must ensure `TYPE_INFO` is an accurate description
+/// of the reflected type to avoid memory corruption (and obvious
+/// semantic breakage).
 ///
-/// [`PropertyClass`][crate::property_class::PropertyClass]es
-/// must always have [`PropertyList`] returned, whereas all
-/// other types use [`ValueInfo`].
+/// [`PropertyClass`][crate::PropertyClass]es must always have
+/// [`PropertyList`] returned, whereas other types use [`ValueInfo`].
 pub unsafe trait Reflected {
-    /// The name of the type.
-    ///
-    /// If reflected types feel the need to build static
-    /// type info based on the name of a different type,
-    /// this can be used to avoid cyclic drop checks.
+    /// The human-readable name of the type.
     const TYPE_NAME: &'static str;
 
-    /// A reference to the [`TypeInfo`] object.
+    /// A reference to the associated [`TypeInfo`].
     const TYPE_INFO: &'static TypeInfo;
 }
 
-/// Provides object-safe [`TypeInfo`] for reflected types.
+/// Provides object-safe [`TypeInfo`] for reflected values.
 ///
-/// It is preferred to implement [`Reflected`] as this trait
-/// comes for free with it.
+/// It is preferred to implement [`Reflected`] as implementations of
+/// this trait come for free through it.
 ///
 /// # Safety
 ///
-/// The same conditions as for [`Reflected`] apply.
+/// Same conditions as for [`Reflected`] apply.
 pub unsafe trait DynReflected {
-    /// Gets the [`TypeInfo`] object for `self`.
+    /// Gets the [`TypeInfo`] for `self`.
     fn type_info(&self) -> &'static TypeInfo;
 }
 
@@ -70,16 +64,16 @@ pub enum TypeInfo {
 }
 
 impl TypeInfo {
-    /// Creates new [`ValueInfo`]-backed type information.
+    /// Creates new [`ValueInfo`]-backed type info.
     ///
-    /// This is a shortcut for calling [`ValueInfo::new`]
-    /// and wrapping the result in [`TypeInfo::Leaf`].
+    /// This is a shortcut for calling [`ValueInfo::new`] and wrapping the
+    /// result in [`TypeInfo::Leaf`].
     #[inline]
     pub const fn leaf<T: Type>(name: Option<&'static str>) -> Self {
         Self::Leaf(ValueInfo::new::<T>(name))
     }
 
-    /// Gets the name of the type.
+    /// Gets the human-readable name of the type.
     #[inline]
     pub const fn type_name(&self) -> &'static str {
         match self {
@@ -106,8 +100,8 @@ impl TypeInfo {
         }
     }
 
-    /// Checks if the type `T` matches the reflected tpye.
-    pub fn is<T: ?Sized + 'static>(&self) -> bool {
+    /// Checks if the type `T` matches the reflected type.
+    pub fn is<T: 'static>(&self) -> bool {
         match self {
             TypeInfo::Class(value) => value.is::<T>(),
             TypeInfo::Leaf(value) => value.is::<T>(),

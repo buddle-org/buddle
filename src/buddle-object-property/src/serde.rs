@@ -1,75 +1,70 @@
 //! Serialization support for `PropertyClass`es.
 //!
-//! NOTE: This is not related to the popular `serde` crate
-//! as its design choices are clashing with the requirements
-//! for reflective serialization we have.
+//! NOTE: This is not related to the popular `serde` crate.
 
-use crate::PropertyClass;
+use crate::type_info::PropertyFlags;
 
-pub mod de;
+mod deserializer;
+pub use deserializer::*;
 
-mod result;
-pub use self::result::*;
+mod serializer;
+pub use serializer::*;
 
-pub mod ser;
+mod type_tag;
+pub use type_tag::*;
 
-/// The value type that corresponds to the identity.
-pub enum IdentityType {
-    /// A plain value type.
-    Value,
-    /// A raw pointer.
-    RawPtr,
-    /// A shared pointer.
-    SharedPtr,
+bitflags::bitflags! {
+    /// Configuration flags to customize serialization behavior.
+    #[repr(transparent)]
+    pub struct SerializerFlags: u8 {
+        /// [`SerializerFlags`] will be included in the output.
+        const STATEFUL_FLAGS = 1 << 0;
+        /// Length prefixes for strings and containers will be compressed
+        /// into a compact representation for small values.
+        const COMPACT_LENGTH_PREFIXES = 1 << 1;
+        /// Enum variants will be serialized as a human-readable variant
+        /// string rather than the integer value.
+        const HUMAN_READABLE_ENUMS = 1 << 2;
+        /// Whether the serialized state should be compressed with zlib.
+        const COMPRESS = 1 << 3;
+        /// Properties with the `DELTA_ENCODE` bit must always have their
+        /// values serialized.
+        const FORBID_DELTA_ENCODE = 1 << 4;
+    }
 }
 
-/// A baton that is passed around during serialization.
-///
-/// This effectively does nothing but prevent users from
-/// calling methods they are not supposed to call out of
-/// context.
-///
-/// Only `Serializer`s and `Deserializer`s create instances
-/// of this type when they start with a root object.
-#[derive(Clone, Copy)]
-pub struct Baton(pub(super) ());
-
-/// Serializes a [`PropertyClass`] to the given
-/// serializer.
-///
-/// This may be used for effortless and consistent
-/// implementations of [`Type::serialize`][crate::Type::serialize] for
-/// custom types.
-pub fn serialize_class<T: PropertyClass>(
-    serializer: &mut dyn ser::DynSerializer,
-    v: &T,
-    baton: Baton,
-) -> Result<()> {
-    serializer.identity(Some(v.property_list()), IdentityType::Value, baton)?;
-    serializer.class(v, baton)
+/// Serialization configuration.
+#[derive(Clone, Copy, Debug)]
+pub struct Config {
+    /// The [`SerializerFlags`] to apply.
+    pub flags: SerializerFlags,
+    /// The [`PropertyFlags`] for masking the properties of an object
+    /// that should be serialized.
+    pub property_mask: PropertyFlags,
+    /// Whether the shallow encoding strategy is used for data.
+    pub shallow: bool,
+    /// A recursion limit for nested data to avoid stack overflows.
+    pub recursion_limit: u8,
 }
 
-/// Deserializes a [`PropertyClass`] from the given
-/// deserializer.
-///
-/// This may be used for effortless and consistent
-/// implementations of [`Type::deserialize`][crate::Type::deserialize] for
-/// custom types.
-pub fn deserialize_class<T: PropertyClass>(
-    deserializer: &mut dyn de::DynDeserializer,
-    v: &mut T,
-    baton: Baton,
-) -> Result<()> {
-    let list = deserializer.identity(IdentityType::Value, baton)?;
-    let list = list.as_ref();
+impl Config {
+    /// Creates the default serializer configuration.
+    ///
+    /// No serializer flags, shallow mode, `TRANSMIT | PRIVILEGED_TRANSMIT`
+    /// property mask, recursion limit of `128`.
+    #[inline(always)]
+    pub const fn new() -> Self {
+        Self {
+            flags: SerializerFlags::empty(),
+            property_mask: PropertyFlags::TRANSMIT.union(PropertyFlags::PRIVILEGED_TRANSMIT),
+            shallow: true,
+            recursion_limit: u8::MAX / 2,
+        }
+    }
+}
 
-    if list.map(|l| l.is::<T>()).unwrap_or(false) {
-        deserializer.class(v, baton)
-    } else {
-        Err(Error::custom(format_args!(
-            "Type mismatch - {} serialized, {} instantiated",
-            list.map(|l| l.type_name()).unwrap_or("nothing"),
-            v.type_info().type_name()
-        )))
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -1,0 +1,15 @@
+[package]
+name = "buddle-nif"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Gamebryo NIF parsing library"
+license = "GPL-2.0"
+repository = "https://gitlab.com/buddle-org/buddle"
+edition = "2021"
+
+[dependencies]
+buddle-math = { path = "../buddle-math" }
+
+binrw = "0.11"
+bitflags = "1.3"
+half = "2.1"

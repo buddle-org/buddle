@@ -1,0 +1,3 @@
+[submodule "src/buddle-nif/nifxml"]
+	path = src/buddle-nif/nifxml
+	url = https://github.com/niftools/nifxml

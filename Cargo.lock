@@ -236,6 +236,7 @@ name = "buddle"
 version = "0.1.0"
 dependencies = [
  "buddle-net",
+ "buddle-nif",
  "buddle-render",
 ]
 
@@ -282,6 +283,16 @@ dependencies = [
  "chrono",
  "rsa",
  "tokio-util",
+]
+
+[[package]]
+name = "buddle-nif"
+version = "0.1.0"
+dependencies = [
+ "binrw",
+ "bitflags",
+ "buddle-math",
+ "half",
 ]
 
 [[package]]
@@ -566,6 +577,12 @@ dependencies = [
  "servo-fontconfig",
  "winapi",
 ]
+
+[[package]]
+name = "crunchy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crypto-common"
@@ -993,6 +1010,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "363e3677e55ad168fef68cf9de3a4a310b53124c5e784c53a1d70e92d23f2126"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "half"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02b4af3693f1b705df946e9fe5631932443781d0aabb423b62fcd4d73f6d2fd0"
+dependencies = [
+ "crunchy",
 ]
 
 [[package]]

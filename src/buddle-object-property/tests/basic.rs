@@ -98,8 +98,8 @@ fn property_flags() {
         b: u32,
     }
 
-    let foo: Box<dyn PropertyClass> = Box::<Foo>::default();
-    let list = foo.property_list();
+    let foooo: Box<dyn PropertyClass> = Box::<Foo>::default();
+    let list = foooo.property_list();
 
     assert_eq!(
         list.property("a").map(|a| a.flags()),
@@ -117,8 +117,8 @@ fn object_name() {
     #[object(name = "Bar")]
     pub struct Foo {}
 
-    let foo: Box<dyn PropertyClass> = Box::new(Foo {});
-    assert_eq!(foo.property_list().type_name(), "Bar");
+    let foooo: Box<dyn PropertyClass> = Box::new(Foo {});
+    assert_eq!(foooo.property_list().type_name(), "Bar");
 }
 
 #[test]
@@ -129,9 +129,9 @@ fn enum_reflection() {
         B = 2,
     }
 
-    let mut foo = Foo::B;
-    assert!(foo.update_variant("A"));
+    let mut foooo = Foo::B;
+    assert!(foooo.update_variant("A"));
 
-    assert_eq!(foo, Foo::A);
+    assert_eq!(foooo, Foo::A);
     assert_eq!(Foo::B.value(), 2);
 }

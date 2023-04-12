@@ -97,7 +97,7 @@ fn arc_interner() {
     let archive = Archive::heap("tests/data/Test.wad", true)
         .map(Arc::new)
         .unwrap();
-    let mut interner = Interner::new(archive.clone());
+    let mut interner = Interner::new(archive);
 
     let handle = interner.intern("subdir/subdir_text1.txt").unwrap();
     let data = interner.fetch(handle).unwrap();

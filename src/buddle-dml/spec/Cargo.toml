@@ -1,0 +1,14 @@
+[package]
+name = "buddle-dml-spec"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Parses DML protocol specifications from XML"
+license = "GPL-2.0"
+edition = "2021"
+
+[dependencies]
+buddle-utils = { path = "../../buddle-utils" }
+
+anyhow = "1.0"
+indexmap = "1.9"
+roxmltree = "0.18"

@@ -7,3 +7,4 @@ license = "GPL-2.0"
 edition = "2021"
 
 [dependencies]
+buddle-dml-spec = { path = "spec" }

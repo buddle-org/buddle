@@ -4,6 +4,7 @@
 #![feature(decl_macro, optimize_attribute)]
 #![forbid(unsafe_code)]
 
+pub use ahash;
 pub use tracing;
 
 pub mod bitint;

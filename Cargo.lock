@@ -262,6 +262,19 @@ dependencies = [
 [[package]]
 name = "buddle-dml"
 version = "0.1.0"
+dependencies = [
+ "buddle-dml-spec",
+]
+
+[[package]]
+name = "buddle-dml-spec"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "buddle-utils",
+ "indexmap",
+ "roxmltree",
+]
 
 [[package]]
 name = "buddle-ecs"
@@ -339,6 +352,7 @@ dependencies = [
 name = "buddle-utils"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.0",
  "tracing",
  "ux",
 ]
@@ -1749,6 +1763,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1382d1f0a252c4bf97dc20d979a2fdd05b024acd7c2ed0f7595d7817666a157"
 
 [[package]]
+name = "roxmltree"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8f595a457b6b8c6cda66a48503e92ee8d19342f905948f29c383200ec9eb1d8"
+dependencies = [
+ "xmlparser",
+]
+
+[[package]]
 name = "rsa"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2613,6 +2636,12 @@ name = "xml-rs"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2d7d3948613f75c98fd9328cfdcc45acc4d360655289d0a7d4ec931392200a3"
+
+[[package]]
+name = "xmlparser"
+version = "0.13.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d25c75bf9ea12c4040a97f829154768bbbce366287e2dc044af160cd79a13fd"
 
 [[package]]
 name = "zeroize"

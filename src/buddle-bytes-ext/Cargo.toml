@@ -1,0 +1,10 @@
+[package]
+name = "buddle-bytes-ext"
+version = "0.1.0"
+authors = ["Valentin B. <valentin.be@protonmail.com>"]
+description = "Fallible read operations for bytes"
+license = "GPL-2.0"
+edition = "2021"
+
+[dependencies]
+bytes = "1.4"

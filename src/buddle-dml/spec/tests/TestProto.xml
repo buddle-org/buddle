@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<TestMessages>
+  <_ProtocolInfo>
+    <RECORD>
+      <ServiceID TYPE="UBYT">1</ServiceID>
+      <ProtocolType TYPE="STR">TEST</ProtocolType>
+      <ProtocolVersion TYPE="INT">1</ProtocolVersion>
+      <ProtocolDescription TYPE="STR">Test messages</ProtocolDescription>
+    </RECORD>
+  </_ProtocolInfo>
+
+  <!--
+    A useless comment.
+  -->
+
+  <MSG_A>
+    <RECORD>
+      <_MsgName TYPE="STR" NOXFER="TRUE">MSG_A</_MsgName>
+      <_MsgDescription TYPE="STR" NOXFER="TRUE">Test A</_MsgDescription>
+      <_MsgHandler TYPE="STR" NOXFER="TRUE">a</_MsgHandler>
+      <_MsgAccessLvl TYPE="UBYT" NOXFER="TRUE">0</_MsgAccessLvl>
+    </RECORD>
+  </MSG_A>
+
+  <MSG_B>
+    <RECORD>
+      <_MsgName TYPE="STR" NOXFER="TRUE">MSG_B</_MsgName>
+      <_MsgDescription TYPE="STR" NOXFER="TRUE">Test B</_MsgDescription>
+      <_MsgHandler TYPE="STR" NOXFER="TRUE">b</_MsgHandler>
+      <_MsgAccessLvl TYPE="UBYT" NOXFER="TRUE">0</_MsgAccessLvl>
+    </RECORD>
+  </MSG_B>
+</TestMessages>

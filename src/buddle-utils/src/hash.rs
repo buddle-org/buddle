@@ -1,8 +1,6 @@
 //! Implementation of dictionary hash functions commonly
 //! used throughout the game.
 
-use crate::bitmask;
-
 /// Produces a String ID of `data`.
 #[inline(always)]
 pub const fn string_id(data: &str) -> u32 {
@@ -15,11 +13,11 @@ pub const fn byte_string_id(data: &[u8]) -> u32 {
     StringIdBuilder::new().feed(data).finish()
 }
 
-/// A builder for String IDs which repeatedly accepts
-/// data and produces the final hash.
+/// A builder for String IDs which repeatedly accepts data and outputs
+/// the final hash value.
 pub struct StringIdBuilder {
     state: i32,
-    byte_index: u32,
+    processed: u32,
 }
 
 impl StringIdBuilder {
@@ -28,23 +26,23 @@ impl StringIdBuilder {
     pub const fn new() -> Self {
         Self {
             state: 0,
-            byte_index: 0,
+            processed: 0,
         }
     }
 
-    /// Consumes the previous builder object and returns a
-    /// new one, with `data` hashed into the state.
+    /// Consumes the previous builder object and returns a new one, with
+    /// `data` hashed into the state.
     ///
-    /// This may be called repeatedly to add more substrings
-    /// to the final hash.
+    /// This may be called repeatedly to add more substrings to the final
+    /// hash.
     #[inline(never)]
-    // LLVM overeagerly tries to vectorize this loop in
-    // optimized builds which results in large codegen.
-    //
-    // But due to our inputs being rather small in most
-    // cases, this is not only a slowdown but also a
-    // revolting source of binary overhead for no gain.
     #[optimize(size)]
+    // LLVM overeagerly tries to vectorize this loop in optimized builds
+    // which results in very large codegen.
+    //
+    // But due to our inputs being rather small in most cases, this is not
+    // only a slowdown but also a revolting source of binary overhead for
+    // no practical gain.
     pub const fn feed(mut self, data: &[u8]) -> Self {
         // Iterate over all the bytes in the string.
         let mut i = 0;
@@ -52,7 +50,7 @@ impl StringIdBuilder {
             // Compute the current value to process and the
             // shift to use based on previous feed() calls.
             let c = data[i] as i32 - 32;
-            let shift = (self.byte_index + i as u32) * 5 % 32;
+            let shift = (self.processed + i as u32) * 5 % 32;
 
             // Perform the hashing operation.
             self.state ^= c.wrapping_shl(shift);
@@ -65,7 +63,7 @@ impl StringIdBuilder {
         }
 
         // Advance the byte index for the next feed() call.
-        self.byte_index += i as u32;
+        self.processed += i as u32;
 
         self
     }
@@ -101,5 +99,5 @@ pub const fn djb2(input: &str) -> u32 {
     }
 
     // XXX: KingsIsle's implementation strips the MSB.
-    state & bitmask!(u32::BITS - 1)
+    state & (u32::MAX >> 1)
 }

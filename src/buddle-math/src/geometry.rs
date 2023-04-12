@@ -1,8 +1,8 @@
 mod point;
-pub use self::point::*;
+pub use point::*;
 
 mod rect;
-pub use self::rect::*;
+pub use rect::*;
 
 mod size;
-pub use self::size::*;
+pub use size::*;

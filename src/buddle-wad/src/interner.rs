@@ -3,136 +3,157 @@ use flate2::{Decompress, FlushDecompress, Status};
 
 use crate::archive::Archive;
 
-/// A file handle which refers to an interned archive file
-/// in an [`Interner`].
+/// A handle to a given file in an [`Interner`].
 ///
-/// Handles can be used with [`Interner::fetch`] to retrieve
-/// the file contents associated with them.
+/// Handles can be used with [`Interner::fetch`] to retrieve the file
+/// contents associated with them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FileHandle(u32);
+pub struct FileHandle(u32, u32);
 
-/// Facilitates decompressing and accessing [`Archive`]
-/// files by assigning them [`FileHandle`]s.
+/// An interner that provides convenient access to files from
+/// an [`Archive`].
 ///
-/// Interning a file loads its **uncompressed** contents
-/// into an internal buffer and conveniently assigns it a
-/// [`FileHandle`] for later retrieval.
+/// Interning a file loads its **uncompressed** contents into an
+/// internal buffer and conveniently assigns it a [`FileHandle`]
+/// for later retrieval.
 ///
-/// By design, handles can only be invalidated all at once.
-/// Specific invalidations per handle are not intended or
-/// supported.
-pub struct Interner {
-    // A dynamically grown buffer which stores all decompressed
-    // file data in it as a contagious stream of data.
-    buffer: Vec<u8>,
+/// [`Interner`]s are tied to the [`Archive`] they are constructed
+/// from, and may not hold files from other archives.
+///
+/// By design, handles can only be invalidated all at once. For
+/// optimizing memory usage, only intern files when you need to use
+/// them and flush after you don't need the files anymore.
+pub struct Interner<A> {
+    archive: A,
+    inner: InnerInterner,
+}
 
-    // Stores the end offsets into `buffer` for every individual
-    // file stream.
+impl<A: AsRef<Archive>> Interner<A> {
+    /// Creates a new, empty interner.
+    pub fn new(archive: A) -> Self {
+        Self {
+            archive,
+            inner: InnerInterner {
+                invalidation_count: 0,
+                buf: Vec::new(),
+                ends: Vec::new(),
+                inflater: Decompress::new(true),
+            },
+        }
+    }
+
+    /// Invalidates all currently interned files and their associated
+    /// [`FileHandle`]s.
+    ///
+    /// After this operation, no lookup for previously issued handles
+    /// will succeed anymore.
+    ///
+    /// Memory allocations from previous usage of the [`Interner`] will
+    /// be preserved for re-use.
+    pub fn invalidate_all(&mut self) {
+        self.inner.invalidation_count += 1;
+        self.inner.buf.clear();
+        self.inner.ends.clear();
+    }
+
+    /// Fetches interned file data given the corresponding [`FileHandle`].
+    ///
+    /// The returned slice always contains decompressed file contents.
+    ///
+    /// Returns [`None`] if the mapping was invalidated.
+    pub fn fetch(&self, handle: FileHandle) -> Option<&[u8]> {
+        let inner = &self.inner;
+        (handle.1 == inner.invalidation_count).then(|| {
+            let idx = handle.0 as usize;
+
+            let start = inner.ends.get(idx.wrapping_sub(1)).copied().unwrap_or(0);
+            let end = inner.ends[idx];
+
+            &inner.buf[start..end]
+        })
+    }
+
+    /// Interns a file named `file` from the [`Archive`].
+    ///
+    /// Returns the [`FileHandle`] associated with the file on success,
+    /// for later retrieval.
+    ///
+    /// This method may fail for several reasons:
+    ///
+    /// - `file` does not exist in the archive
+    ///
+    /// - decompressing the file falied, either due ot invalid data or
+    ///   invalid encoded size expectations
+    pub fn intern(&mut self, file: &str) -> anyhow::Result<FileHandle> {
+        self.inner.intern(self.archive.as_ref(), file)
+    }
+}
+
+struct InnerInterner {
+    // The number of times the interner state was invalidated.
+    // This is tracked so previously issued file handles cannot
+    // accidentally fetch garbage after invalidation anymore.
+    invalidation_count: u32,
+
+    // A dynamically grown buffer which stores all decompressed file
+    // data as a contagious stream of bytes.
+    buf: Vec<u8>,
+
+    // Stores the end offsets into `buffer` for every individual file.
     //
     // We use indices into this list as the file access handles.
     ends: Vec<usize>,
 
-    // The zlib object for data decompression.
-    decompress: Decompress,
+    // The zlib inflater state for data decompression.
+    inflater: Decompress,
 }
 
-impl Interner {
-    /// Creates a new, empty interner.
-    pub fn new() -> Self {
-        Self {
-            buffer: Vec::new(),
-            ends: Vec::new(),
-            decompress: Decompress::new(true),
-        }
-    }
-
-    /// Invalidates all currently interned files and their
-    /// associated [`FileHandle`]s.
-    ///
-    /// After this operation, no previously interned file
-    /// can be retrieved anymore.
-    ///
-    /// The memory allocations will be preserved.
-    pub fn invalidate_all(&mut self) {
-        self.buffer.clear();
-        self.ends.clear();
-    }
-
-    /// Interns a file named `file` from the `archive`.
-    ///
-    /// This will return the [`FileHandle`] associated
-    /// with the file on success, or an error in one
-    /// of the following conditions:
-    ///
-    /// - `file` does not exist inside the archive
-    /// - for compressed files, decompressing it fails
-    pub fn intern(&mut self, archive: &Archive, file: &str) -> anyhow::Result<FileHandle> {
+impl InnerInterner {
+    fn intern(&mut self, archive: &Archive, file: &str) -> anyhow::Result<FileHandle> {
         let raw_archive = archive.raw_archive();
         let file = archive
             .journal()
             .find(file)
-            .ok_or_else(|| anyhow!("{} is not in the archive", file))?;
+            .ok_or_else(|| anyhow!("'{file}' is not in the archive"))?;
 
-        // Make a new, unique handle out of the index for
-        // the metadata we are going to store for the file.
-        let handle = FileHandle(self.ends.len() as u32);
+        // Make a new handle for the file. Archives have an upper limit of
+        // u32 files, so by design this can never produce ambiguous values.
+        let handle = FileHandle(self.ends.len() as u32, self.invalidation_count);
 
-        // Remember where this file is starting in memory.
-        let file_start = self.ends.last().copied().unwrap_or(0);
-        self.ends.push(file_start + file.uncompressed_size as usize);
+        // Remember where this file is ending in memory.
+        let size_hint = file.uncompressed_size as usize;
+        self.ends.push(self.buf.len() + size_hint);
 
+        // Extract the file contents from the archive data.
         let data = file.extract(raw_archive);
         if file.compressed {
-            // Decompress the data to the end of our internal buffer.
-            self.decompress_to_end(data, file_start)?;
+            // Decompress the data into our internal buffer.
+            self.decompress_to_buf(data, size_hint)?;
         } else {
-            // The file is not compressed, so we just
-            // extend the data buffer with it.
-            self.buffer.extend_from_slice(file.extract(raw_archive));
+            // The file is not compressed, so we just grow the buffer.
+            self.buf.extend_from_slice(data);
         }
 
         Ok(handle)
     }
 
-    /// Fetches interned file data given the [`FileHandle`]
-    /// obtained from [`Interner::intern`].
-    ///
-    /// The returned slice always contains decompressed file
-    /// contents.
-    ///
-    /// Returns [`None`] if the mapping was previously
-    /// invalidated and not populated again.
-    pub fn fetch(&self, handle: FileHandle) -> Option<&[u8]> {
-        let idx = handle.0 as usize;
-        self.ends.get(idx).map(|&end| {
-            let start = self.ends.get(idx.wrapping_sub(1)).copied().unwrap_or(0);
-            &self.buffer[start..end]
-        })
-    }
-
-    fn decompress_to_end(&mut self, data: &[u8], start: usize) -> anyhow::Result<()> {
+    fn decompress_to_buf(&mut self, data: &[u8], hint: usize) -> anyhow::Result<()> {
         // Reserve enough memory for decompressing the file.
-        self.buffer.resize(start + data.len(), 0);
+        let start = self.buf.len();
+        self.buf.resize(start + hint, 0);
 
         // Decompress the data into the internal buffer.
         if self
-            .decompress
-            .decompress(data, &mut self.buffer[start..], FlushDecompress::Finish)?
+            .inflater
+            .decompress(data, &mut self.buf[start..], FlushDecompress::Finish)?
             != Status::StreamEnd
         {
-            bail!("Received incomplete zlib stream or wrong size expectation");
+            bail!("received incomplete zlib stream or wrong size expectation");
         }
 
         // Reset decompress object for next usage.
-        self.decompress.reset(true);
+        self.inflater.reset(true);
 
-        // Return the data we decompressed.
         Ok(())
-    }
-}
-
-impl Default for Interner {
-    fn default() -> Self {
-        Self::new()
     }
 }

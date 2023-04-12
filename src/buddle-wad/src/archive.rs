@@ -9,14 +9,6 @@ use memmap2::{Mmap, MmapOptions};
 
 use crate::types as wad_types;
 
-/// A read-only archive that is either memory-mapped or
-/// allocated in heap memory.
-///
-/// In the interest of performance optimization, control
-/// over how a file is processed is handed to the user.
-///
-/// For smaller files, the heap backend should always be
-/// preferred over memory mappings.
 pub struct Archive(ArchiveInner);
 
 enum ArchiveInner {
@@ -25,49 +17,33 @@ enum ArchiveInner {
 }
 
 impl Archive {
-    /// Opens a file at the given `path` and tries to parse
-    /// it in heap memory.
+    /// Opens a file at the given `path` and operates on it
+    /// from heap-allocated memory.
     ///
-    /// The file will be closed immediately after it was
-    /// read.
+    /// The file handle will be closed immediately after reading.
     ///
-    /// `verify_crc` will optionally validate all encoded
-    /// CRCs in the archive file when `true`.
+    /// `verify_crc` will optionally run validation of all encoded
+    /// CRCs in archive files when `true`.
     ///
-    /// This is the preferred option of working with relatively
-    /// small files but it's always best to profile.
+    /// This is the preferred option of working with relatively small
+    /// files but it's always best to profile.
     pub fn heap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        HeapArchive::open(path, verify_crc)
-            .map(|a| Archive(ArchiveInner::Heap(a)))
+        HeapArchive::open(path, verify_crc).map(|a| Self(ArchiveInner::Heap(a)))
     }
 
-    /// Opens a file at the given `path` and maps it into
-    /// memory without copying the data.
+    /// Opens a file at the given `path` and operates on it
+    /// from a memory mapping.
     ///
-    /// The file will be kept open for the entire lifetime
-    /// of the [`Archive`] object to keep the mapping intact.
+    /// The file handle will be kept open for the entire lifetime
+    /// of the [`Archive`] object.
     ///
-    /// `verify_crc` will optionally validate all encoded
-    /// CRCs in the archive file when `true`.
+    /// `verify_crc` will optionally run validation of all encoded
+    /// CRCs in the archive files when `true`.
     ///
-    /// This is the preferred option of working with relatively
-    /// large files but it's always best to profile.
+    /// The is the preferred option of working with relatively large
+    /// files but it's always best to profile.
     pub fn mmap<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        MemoryMappedArchive::open(path, verify_crc)
-            .map(|a| Archive(ArchiveInner::MemoryMapped(a)))
-    }
-
-    /// Gets the number of files in the archive.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.journal().inner.len()
-    }
-
-    /// Whether the archive is empty, i.e. does not contain
-    /// any files.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        MemoryMappedArchive::open(path, verify_crc).map(|a| Self(ArchiveInner::MemoryMapped(a)))
     }
 
     #[inline]
@@ -86,19 +62,35 @@ impl Archive {
         }
     }
 
-    /// Gets the raw contents of an archived file by its
-    /// encoded name string.
+    /// Gets the number of files in the archive.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.journal().inner.len()
+    }
+
+    /// Whether the archive is empty, i.e. does not contain any files.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Gets the raw contents of an archived file by its string name.
     ///
-    /// This returns a `(is_compressed, contents)` tuple
-    /// to give the user maximum flexibility about how
-    /// to process the results.
+    /// This returns a `(is_compressed, contents)` tuple to give the
+    /// user maximum flexibility in how to process the results.
     ///
-    /// Returns [`None`] when no such file exists in the
-    /// archive.
+    /// Returns [`None`] when no file named `name` exists in the archive.
     pub fn file_raw(&self, name: &str) -> Option<(bool, &[u8])> {
         self.journal()
             .find(name)
             .map(|f| (f.compressed, f.extract(self.raw_archive())))
+    }
+}
+
+impl AsRef<Archive> for Archive {
+    #[inline]
+    fn as_ref(&self) -> &Archive {
+        self
     }
 }
 
@@ -122,31 +114,34 @@ impl Journal {
 }
 
 struct MemoryMappedArchive {
-    // We internally hold the file so it stays open for the
-    // lifetime of the memory mapping.
+    // Internally kept memory mapping of the archive file contents.
     //
-    // Unmapped before the underlying file is closed.
+    // By guaranteed drop order, this will be unmapped before the
+    // file below is closed.
     mapping: Mmap,
 
-    // The owned file that backs the archive.
+    // The backing file of the above mapping.
     //
-    // Closed after the mapping is dropped.
+    // Owned by this structure so the mapping never becomes invalid.
+    // Closed when this structure is dropped.
     #[allow(unused)]
     file: File,
 
+    // The journal of files in the archive.
     journal: Journal,
 }
 
 impl MemoryMappedArchive {
     fn open<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        // Open the file for the given path.
+        // Attempt to open the file at the given path.
         let file = File::open(path)?;
-
-        // Map it into memory.
         let mut this = Self {
-            // SAFETY: We own the file and WAD archives are generally
-            // treated as read-only by the game, we most likely won't
-            // run into any realistic synchronization conflicts with it.
+            // SAFETY: We own the file and keep it around until the mapping
+            // is closed; see comments in `MemoryMappedArchive` above.
+            //
+            // Since archive files are generally treated as read-only by us
+            // and most other applications, we likely won't run into any
+            // synchronization conflicts we need to account for.
             mapping: unsafe { MmapOptions::new().populate().map(&file)? },
             file,
             journal: Journal {
@@ -166,21 +161,21 @@ impl MemoryMappedArchive {
 }
 
 struct HeapArchive {
+    // The journal of files in the archive.
     journal: Journal,
-    data: Vec<u8>,
+
+    // The raw archive data, allocated on the heap.
+    data: Box<[u8]>,
 }
 
 impl HeapArchive {
     fn open<P: AsRef<Path>>(path: P, verify_crc: bool) -> anyhow::Result<Self> {
-        // Read the file at path into a vector.
-        let data = fs::read(path)?;
-
-        // Create the archive object.
+        // Attempt to read the given file into a byte vector.
         let mut this = Self {
             journal: Journal {
                 inner: BTreeMap::new(),
             },
-            data,
+            data: fs::read(path)?.into_boxed_slice(),
         };
 
         // Parse the archive and build the file journal.

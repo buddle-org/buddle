@@ -2,14 +2,17 @@
 name = "buddle-wad"
 version = "0.1.0"
 authors = ["Valentin B. <valentin.be@protonmail.com>"]
-description = "Handling and parsing of KIWAD archives"
+description = "Library for parsing and interacting with KIWAD archives"
 license = "GPL-2.0"
-repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-binrw = "0.10"
+binrw = "0.11"
 crc32fast = "1.3"
 flate2 = { version = "1.0", default-features = false, features = ["zlib-ng-compat"] }
 memmap2 = "0.5"
+
+[features]
+default = ["flate2/miniz_oxide"]
+zlib-simd = ["flate2/zlib-ng-compat"]

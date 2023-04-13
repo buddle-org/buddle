@@ -54,7 +54,7 @@ pub mod type_info;
 mod r#type;
 pub use self::r#type::*;
 
-mod registry;
+pub mod registry;
 
 #[doc(hidden)]
 pub mod __private {

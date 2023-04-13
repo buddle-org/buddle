@@ -79,4 +79,7 @@ Thumbs.db
 # Game type list
 r*.Wizard*.json
 
+# Game test data
+Root.wad
+
 result/

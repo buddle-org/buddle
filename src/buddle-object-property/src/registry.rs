@@ -4,11 +4,16 @@ use std::collections::HashMap;
 use crate::serde::TypeTag;
 use crate::type_info::{PropertyList, Reflected, TypeInfo::Class};
 
+#[derive(Default)]
 pub struct Registry {
     registry: HashMap<u32, &'static PropertyList>
 }
 
 impl Registry {
+    pub fn new() -> Self {
+        Registry { registry: HashMap::new() }
+    }
+
     pub fn register<T: Reflected>(&mut self) {
         match T::TYPE_INFO {
             Class(list) => {

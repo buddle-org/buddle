@@ -237,7 +237,9 @@ version = "0.1.0"
 dependencies = [
  "buddle-net",
  "buddle-nif",
+ "buddle-object-property",
  "buddle-render",
+ "buddle-wad",
 ]
 
 [[package]]

@@ -102,61 +102,67 @@ fn parse_object_attr<'a>(attrs: &mut Attrs<'a>, attr: &'a Attribute) -> Result<(
     let object = attrs.object.as_mut().unwrap();
 
     attr.parse_args_with(|input: ParseStream<'_>| {
-        let look = input.lookahead1();
-        if look.peek(kw::name) {
-            if object.name.is_some() {
-                return Err(Error::new_spanned(
-                    attr,
-                    "duplicate #[object(name)] attribute found",
-                ));
+        let mut first = true;
+        while !input.is_empty() {
+            if !first {
+                input.parse::<Token![,]>()?;
             }
 
-            let AttrWrapper::<kw::name, LitStr> { value: name, .. } = input.parse()?;
-            object.name = Some(name);
-            Ok(())
-        } else if look.peek(kw::on_pre_save) {
-            if object.on_pre_save.is_some() {
-                return Err(Error::new_spanned(
-                    attr,
-                    "duplicate #[object(on_pre_save)] attribute found",
-                ));
+            let look = input.lookahead1();
+            if look.peek(kw::name) {
+                if object.name.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "duplicate #[object(name)] attribute found",
+                    ));
+                }
+
+                let AttrWrapper::<kw::name, LitStr> { value: name, .. } = input.parse()?;
+                object.name = Some(name);
+            } else if look.peek(kw::on_pre_save) {
+                if object.on_pre_save.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "duplicate #[object(on_pre_save)] attribute found",
+                    ));
+                }
+
+                object.on_pre_save = Some(parse_mod_path::<kw::on_pre_save>(input)?);
+            } else if look.peek(kw::on_post_save) {
+                if object.on_post_save.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "duplicate #[object(on_post_save)] attribute found",
+                    ));
+                }
+
+                object.on_post_save = Some(parse_mod_path::<kw::on_post_save>(input)?);
+            } else if look.peek(kw::on_pre_load) {
+                if object.on_pre_load.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "duplicate #[object(on_pre_load)] attribute found",
+                    ));
+                }
+
+                object.on_pre_load = Some(parse_mod_path::<kw::on_pre_load>(input)?);
+            } else if look.peek(kw::on_post_load) {
+                if object.on_post_load.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "duplicate #[object(on_post_load)] attribute found",
+                    ));
+                }
+
+                object.on_post_load = Some(parse_mod_path::<kw::on_post_load>(input)?);
+            } else {
+                return Err(look.error());
             }
 
-            object.on_pre_save = Some(parse_mod_path::<kw::on_pre_save>(input)?);
-            Ok(())
-        } else if look.peek(kw::on_post_save) {
-            if object.on_post_save.is_some() {
-                return Err(Error::new_spanned(
-                    attr,
-                    "duplicate #[object(on_post_save)] attribute found",
-                ));
-            }
-
-            object.on_post_save = Some(parse_mod_path::<kw::on_post_save>(input)?);
-            Ok(())
-        } else if look.peek(kw::on_pre_load) {
-            if object.on_pre_load.is_some() {
-                return Err(Error::new_spanned(
-                    attr,
-                    "duplicate #[object(on_pre_load)] attribute found",
-                ));
-            }
-
-            object.on_pre_load = Some(parse_mod_path::<kw::on_pre_load>(input)?);
-            Ok(())
-        } else if look.peek(kw::on_post_load) {
-            if object.on_post_load.is_some() {
-                return Err(Error::new_spanned(
-                    attr,
-                    "duplicate #[object(on_post_load)] attribute found",
-                ));
-            }
-
-            object.on_post_load = Some(parse_mod_path::<kw::on_post_load>(input)?);
-            Ok(())
-        } else {
-            Err(look.error())
+            first = false;
         }
+
+        Ok(())
     })
 }
 

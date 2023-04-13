@@ -52,7 +52,7 @@ impl core::ops::DerefMut for RawString {
 
 impl fmt::Debug for RawString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NullString(\"")?;
+        write!(f, "RawString(\"")?;
         display_utf8(&self.0, f, str::escape_debug)?;
         write!(f, "\")")
     }

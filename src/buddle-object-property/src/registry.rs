@@ -1,17 +1,18 @@
 use std::collections::HashMap;
 
-
 use crate::serde::TypeTag;
 use crate::type_info::{PropertyList, Reflected, TypeInfo::Class};
 
 #[derive(Default)]
 pub struct Registry {
-    registry: HashMap<u32, &'static PropertyList>
+    registry: HashMap<u32, &'static PropertyList>,
 }
 
 impl Registry {
     pub fn new() -> Self {
-        Registry { registry: HashMap::new() }
+        Registry {
+            registry: HashMap::new(),
+        }
     }
 
     pub fn register<T: Reflected>(&mut self) {
@@ -19,21 +20,26 @@ impl Registry {
             Class(list) => {
                 self.registry.insert(list.type_hash(), list);
             }
-            _ => panic!("Expected Class not leaf")
+            _ => panic!("Expected Class not leaf"),
         }
     }
 }
 
 impl TypeTag for Registry {
-    fn read_tag(&self, de: &mut crate::serde::Deserializer<'_>)
-        -> anyhow::Result<Option<Box<dyn crate::PropertyClass>>> {
+    fn read_tag(
+        &self,
+        de: &mut crate::serde::Deserializer<'_>,
+    ) -> anyhow::Result<Option<Box<dyn crate::PropertyClass>>> {
         let type_hash = de.reader().u32()?;
-        
+
         if type_hash == 0 {
             return Ok(None);
         }
 
-        let list = self.registry.get(&type_hash).ok_or_else(|| anyhow::anyhow!("Hash {type_hash} not in registry"))?;
+        let list = self
+            .registry
+            .get(&type_hash)
+            .ok_or_else(|| anyhow::anyhow!("Hash {type_hash} not in registry"))?;
         Ok(Some(list.make_default()))
     }
 
@@ -51,10 +57,14 @@ impl TypeTag for Registry {
         }
     }
 
-    fn write_tag(&self, ser: &mut crate::serde::Serializer<'_>, obj: Option<&dyn crate::PropertyClass>) {
+    fn write_tag(
+        &self,
+        ser: &mut crate::serde::Serializer<'_>,
+        obj: Option<&dyn crate::PropertyClass>,
+    ) {
         let type_hash = match obj {
             Some(class) => class.property_list().type_hash(),
-            None => 0
+            None => 0,
         };
 
         ser.writer().u32(type_hash);

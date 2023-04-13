@@ -219,17 +219,19 @@ impl<'a> Serializer<'a> {
         }
     }
 
-    /// Serializes the length of a [`Container`] object to the stream, followed
-    /// by the elements themselves.
+    /// Serializes the length of a [`Container`][crate::Container] object
+    /// to the stream, followed by the elements themselves.
     ///
-    /// This method may be used to implement [`Type::serialize`] for containers.
+    /// This method may be used to implement
+    /// [`Type::serialize`][crate::Type::serialize] for containers.
     pub fn serialize_container_len(&mut self, len: usize) {
         self.write_seq_len(len);
     }
 
     /// Serializes an [`Enum`] object to the stream.
     ///
-    /// This method may be used to implement [`Type::serialize`] for enums.
+    /// This method may be used to implement
+    /// [`Type::serialize`][crate::Type::serialize] for enums.
     pub fn serialize_enum(&mut self, v: &dyn Enum) {
         if self
             .config

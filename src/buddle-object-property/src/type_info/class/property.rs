@@ -37,7 +37,7 @@ bitflags! {
     }
 }
 
-/// Description of a property in a [`PropertyClass`].
+/// Description of a property in a [`PropertyClass`][crate::PropertyClass].
 ///
 /// Properties, being reflected fields of Rust structs, have the following
 /// details exposed for reflective access:
@@ -143,7 +143,8 @@ impl Property {
     /// # Safety
     ///
     /// Unless you have a particular reason against it, prefer
-    /// [`PropertyClass::property`] for accessing values.
+    /// [`PropertyClass::property`][crate::PropertyClass::property] for accessing
+    /// values.
     ///
     /// - `obj` must point to an initialized and aligned instance of the object
     ///   that contains this [`Property`] value.
@@ -172,7 +173,8 @@ impl Property {
     /// # Safety
     ///
     /// Unless you have a particular reason against it, prefer
-    /// [`PropertyClass::property_mut`] for accessing values.
+    /// [`PropertyClass::property_mut`][crate::PropertyClass::property_mut] for
+    /// accessing values.
     ///
     /// - `obj` must point to an initialized and aligned instance of the object
     ///   that contains this [`Property`] value.

@@ -582,7 +582,7 @@ impl TryFrom<usize> for AlphaFormat {
     }
 }
 
-/// Describes the availiable texture clamp modes, i.e. the behavior of UV mapping outside the [0,1] range.
+/// Describes the availiable texture clamp modes, i.e. the behavior of UV mapping outside the \[0,1\] range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, BinRead)]
 #[repr(u32)]
 pub enum TexClampMode {

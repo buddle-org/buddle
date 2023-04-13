@@ -15,7 +15,7 @@ mod encoding;
 pub use encoding::BinaryEncoding;
 
 mod message;
-pub use message::{DispatchFuture, Message};
+pub use message::Message;
 
 mod protocol;
 pub use protocol::Protocol;

@@ -303,6 +303,8 @@ impl<'de> Deserializer<'de> {
     ///
     /// This method may be used to implement [`Type::deserialize`] for classes.
     /// Do not use it as the generic entrypoint to type deserialization.
+    ///
+    /// [`Type::deserialize`]: crate::Type::deserialize
     pub fn deserialize_class(&mut self, v: &mut dyn PropertyClass) -> anyhow::Result<()> {
         self.with_recursion_limit(|ser| {
             // Read the object's type tag and make sure it belongs to `v`.
@@ -341,7 +343,7 @@ impl<'de> Deserializer<'de> {
     /// containers.
     ///
     /// [`Container`]: crate::container::Container
-    /// [`Type::deserialize`]: crate::r#type::Type::deserialize
+    /// [`Type::deserialize`]: crate::Type::deserialize
     #[inline]
     pub fn deserialize_container_len(&mut self) -> anyhow::Result<usize> {
         self.read_seq_len()
@@ -352,7 +354,7 @@ impl<'de> Deserializer<'de> {
     /// This method may be used to implement [`Type::deserialize`] for
     /// enums.
     ///
-    /// [`Type::deserialize`]: crate::r#type::Type::deserialize
+    /// [`Type::deserialize`]: crate::Type::deserialize
     pub fn deserialize_enum(&mut self, v: &mut dyn Enum) -> anyhow::Result<()> {
         let success = if self
             .config

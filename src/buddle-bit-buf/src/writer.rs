@@ -133,7 +133,7 @@ impl BitWriter {
     /// Reserves a length prefix of a given literal type `I` in the buffer.
     ///
     /// After calling this method, the bits written to the buffer will be
-    /// counted until [`BitWriter::place_length_prefix`] is called.
+    /// counted until [`BitWriter::write_length_prefix`] is called.
     pub fn reserve_length_prefix<I: Integral>(&mut self) -> LengthPrefix<I>
     where
         usize: IntCast<I>,

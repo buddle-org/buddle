@@ -1,12 +1,9 @@
-use std::{any::Any, fmt, net::SocketAddr};
+use std::fmt;
 
 use crate::{access_level::AccessLevel, encoding::BinaryEncoding, protocol::Protocol};
 
 // FIXME: Do not require heap allocation of the futures.
 // https://github.com/rust-lang/rust/issues/107011
-
-/// The future produced by [`Message::dispatch_request`].
-pub type DispatchFuture<'a> = futures::future::BoxFuture<'a, anyhow::Result<()>>;
 
 /// Generic message type that belongs to some protocol.
 ///
@@ -29,28 +26,6 @@ pub trait Message: fmt::Debug + Send + BinaryEncoding + 'static {
 
     /// Gets the unique order number of the message within a protocol.
     fn order(&self) -> u8;
-
-    /// Dispatches this message as a [`Request`][crate::Request] to its
-    /// designated handler.
-    ///
-    /// Extra state can be passed to the handler through `extra`, which
-    /// will be downcasted into the expected type.
-    ///
-    /// Implementors should use the [`Handler`][crate::Handler] trait to
-    /// support as many variations of handler functions as possible.
-    ///
-    /// # Panics
-    ///
-    /// Panics when downcasting `extra` into the correct type fails.
-    ///
-    /// This issue is best avoided by only passing one uniform type for
-    /// all messages to this function.
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    fn dispatch_request(
-        self: Box<Self>,
-        addr: SocketAddr,
-        extra: &mut dyn Any,
-    ) -> DispatchFuture<'_>;
 }
 
 impl Clone for Box<dyn Message> {

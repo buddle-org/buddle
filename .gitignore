@@ -77,7 +77,7 @@ Thumbs.db
 *.zip
 
 # Game type list
-r*.Wizard*.json
+r*_Wizard*.json
 
 # Game test data
 Root.wad

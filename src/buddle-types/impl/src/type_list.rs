@@ -1,6 +1,5 @@
 use std::{collections::HashMap, io};
 
-use anyhow::anyhow;
 use buddle_object_property::type_info::PropertyFlags;
 use serde::{Deserialize, Deserializer};
 

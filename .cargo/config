@@ -6,3 +6,6 @@ rustflags = ["-Ctarget-feature=+crt-static"]
 
 [target.i586-pc-windows-msvc]
 rustflags = ["-Ctarget-feature=+crt-static"]
+
+[env]
+BUDDLE_TYPE_LIST = "..\\..\\types.json"

@@ -32,3 +32,33 @@ pub struct SimplifiedPipelineConfig {
     pub wireframe: bool,
     pub msaa: MSAA,
 }
+
+/// See docs for [`wgpu::TextureViewDimension`]
+#[derive(Copy, Clone)]
+pub enum TextureDimensions {
+    D1,
+    D2,
+    D2Array,
+    Cube,
+    CubeArray,
+    D3,
+}
+
+impl Into<wgpu::TextureViewDimension> for &TextureDimensions {
+    fn into(self) -> wgpu::TextureViewDimension {
+        match self {
+            TextureDimensions::D1 => wgpu::TextureViewDimension::D1,
+            TextureDimensions::D2 => wgpu::TextureViewDimension::D2,
+            TextureDimensions::D2Array => wgpu::TextureViewDimension::D2Array,
+            TextureDimensions::Cube => wgpu::TextureViewDimension::Cube,
+            TextureDimensions::CubeArray => wgpu::TextureViewDimension::CubeArray,
+            TextureDimensions::D3 => wgpu::TextureViewDimension::D3,
+        }
+    }
+}
+
+pub enum BindGroupLayoutEntry {
+    Buffer,
+    Sampler,
+    Texture(TextureDimensions),
+}

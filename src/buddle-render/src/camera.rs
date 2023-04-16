@@ -4,6 +4,7 @@ use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform, Vector3};
 use wgpu::{BindGroup, Buffer, BufferUsages};
 
 use crate::gpu::{Context, RenderBuffer};
+use crate::BindGroupLayoutEntry;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum CameraType {
@@ -59,7 +60,10 @@ impl Camera {
             &[camera_matrices],
             BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         );
-        let camera_bind_group = ctx.create_bind_group(vec![&camera_buffer]);
+        let camera_bind_group = ctx.create_bind_group(
+            ctx.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
+            vec![camera_buffer.as_entire_binding()],
+        );
         Rasterizer::new(self, camera_buffer, camera_bind_group)
     }
 }

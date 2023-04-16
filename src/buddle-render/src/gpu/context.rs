@@ -127,7 +127,10 @@ impl Context {
             )],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
-        let model_bind_group = self.create_bind_group(vec![&model_buffer]);
+        let model_bind_group = self.create_bind_group(
+            self.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
+            vec![model_buffer.as_entire_binding()],
+        );
 
         Mesh {
             num_triangles: indices.len() as u32,
@@ -139,7 +142,11 @@ impl Context {
     }
 
     /// Creates a new [Shader]
-    pub fn create_shader(&self, code: &str, bind_group_layouts: Vec<&wgpu::BindGroupLayout>) -> Shader {
+    pub fn create_shader(
+        &self,
+        code: &str,
+        bind_group_layouts: Vec<&wgpu::BindGroupLayout>,
+    ) -> Shader {
         const GENERIC_PIPELINE_CONFIG: SimplifiedPipelineConfig = SimplifiedPipelineConfig {
             wireframe: false,
             msaa: MSAA::Off,
@@ -151,8 +158,12 @@ impl Context {
                 source: wgpu::ShaderSource::Wgsl(code.into()),
             });
 
-        let pipeline =
-            self.create_pipeline(&module, self.surface.config.format, bind_group_layouts, GENERIC_PIPELINE_CONFIG);
+        let pipeline = self.create_pipeline(
+            &module,
+            self.surface.config.format,
+            bind_group_layouts,
+            GENERIC_PIPELINE_CONFIG,
+        );
 
         Shader { module, pipeline }
     }
@@ -203,8 +214,8 @@ impl Context {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             // todo: properly control filtering mode
-            min_filter: wgpu::FilterMode::Linear,
-            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
@@ -213,27 +224,69 @@ impl Context {
             texture,
             view,
             sampler,
+            dimensions: TextureDimensions::D2,
             size,
         };
 
         inner
     }
 
-    // Todo: Add textures support
-    pub fn create_bind_group_layout(&self, buffer_count: usize) -> wgpu::BindGroupLayout {
+    pub fn create_material(&self, shader: Shader, diffuse: Texture) -> Material {
+        let bind_group = self.create_bind_group(
+            self.create_bind_group_layout(vec![
+                BindGroupLayoutEntry::Texture(diffuse.dimensions),
+                BindGroupLayoutEntry::Sampler,
+            ]),
+            vec![
+                wgpu::BindingResource::TextureView(&diffuse.view),
+                wgpu::BindingResource::Sampler(&diffuse.sampler),
+            ],
+        );
+
+        Material {
+            shader,
+            diffuse,
+            bind_group,
+        }
+    }
+
+    pub fn create_bind_group_layout(
+        &self,
+        layout: Vec<BindGroupLayoutEntry>,
+    ) -> wgpu::BindGroupLayout {
         let mut entries = Vec::<wgpu::BindGroupLayoutEntry>::new();
 
-        for _ in 0..buffer_count {
-            entries.push(wgpu::BindGroupLayoutEntry {
-                binding: entries.len() as u32,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            });
+        for entry in layout {
+            match entry {
+                BindGroupLayoutEntry::Buffer => entries.push(wgpu::BindGroupLayoutEntry {
+                    binding: entries.len() as u32,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }),
+
+                BindGroupLayoutEntry::Sampler => entries.push(wgpu::BindGroupLayoutEntry {
+                    binding: entries.len() as u32,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                }),
+
+                BindGroupLayoutEntry::Texture(typ) => entries.push(wgpu::BindGroupLayoutEntry {
+                    binding: entries.len() as u32,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: (&typ).into(),
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                }),
+            }
         }
 
         self.device
@@ -243,38 +296,23 @@ impl Context {
             })
     }
 
-    pub fn create_bind_group(&self, buffers: Vec<&wgpu::Buffer>) -> wgpu::BindGroup {
-        let mut l_entries = Vec::<wgpu::BindGroupLayoutEntry>::new();
-        let mut bg_entries = Vec::<wgpu::BindGroupEntry>::new();
+    pub fn create_bind_group(
+        &self,
+        layout: wgpu::BindGroupLayout,
+        bindings: Vec<wgpu::BindingResource>,
+    ) -> wgpu::BindGroup {
+        let mut entries = Vec::<wgpu::BindGroupEntry>::new();
 
-        for buffer in buffers {
-            l_entries.push(wgpu::BindGroupLayoutEntry {
-                binding: l_entries.len() as u32,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            });
-
-            bg_entries.push(wgpu::BindGroupEntry {
-                binding: bg_entries.len() as u32,
-                resource: buffer.as_entire_binding(),
+        for resource in bindings {
+            entries.push(wgpu::BindGroupEntry {
+                binding: entries.len() as u32,
+                resource,
             });
         }
 
-        let layout = self
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Bind Group Layout"),
-                entries: l_entries.as_slice(),
-            });
-
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &layout,
-            entries: bg_entries.as_slice(),
+            entries: entries.as_slice(),
             label: Some("Bind Group"),
         })
     }
@@ -388,6 +426,7 @@ impl Context {
             texture,
             view,
             sampler,
+            dimensions: TextureDimensions::D2,
             size: Vector2::new(config.width, config.height),
         };
 

@@ -2,6 +2,8 @@
 
 use cgmath::Vector2;
 
+use crate::TextureDimensions;
+
 pub struct Surface {
     pub(crate) surface: wgpu::Surface,
     pub(crate) config: wgpu::SurfaceConfiguration,
@@ -22,10 +24,9 @@ pub struct Texture {
     pub(crate) texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
     pub(crate) sampler: wgpu::Sampler,
+    pub(crate) dimensions: TextureDimensions,
     pub(crate) size: Vector2<u32>,
 }
-
-// Custom types based on type abstractions
 
 pub struct Mesh {
     pub num_triangles: u32,

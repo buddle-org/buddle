@@ -3,12 +3,13 @@
 use cgmath::{Matrix4, Vector4, Zero};
 use wgpu::BindGroup;
 
-use crate::camera::{ModelMatrices};
+use crate::camera::ModelMatrices;
 use crate::gpu::{context::Context, Mesh, Shader};
+use crate::Material;
 
 pub(crate) struct DrawCall<'a> {
     mesh: &'a Mesh,
-    shader: &'a Shader,
+    material: &'a Material,
     model_matrix: Matrix4<f32>,
 }
 
@@ -45,12 +46,12 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
     pub fn add_draw_call(
         &mut self,
         mesh: &'a Mesh,
-        shader: &'a Shader,
+        material: &'a Material,
         model_matrix: Matrix4<f32>,
     ) {
         self.draw_calls.push(DrawCall {
             mesh,
-            shader,
+            material,
             model_matrix,
         });
     }
@@ -118,11 +119,11 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
                     )],
                 );
 
-                render_pass.set_pipeline(&draw_call.shader.pipeline);
+                render_pass.set_pipeline(&draw_call.material.shader.pipeline);
 
                 render_pass.set_bind_group(0, self.camera_bind_group, &[]);
                 render_pass.set_bind_group(1, &draw_call.mesh.model_bind_group, &[]);
-                //render_pass.set_bind_group(2, &draw_call.material.bind_group, &[]);
+                render_pass.set_bind_group(2, &draw_call.material.bind_group, &[]);
 
                 render_pass.set_vertex_buffer(0, draw_call.mesh.vertex_buffer.slice(..));
                 render_pass.set_index_buffer(

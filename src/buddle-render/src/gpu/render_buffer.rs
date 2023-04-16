@@ -4,7 +4,7 @@ use cgmath::{Matrix4, Vector4, Zero};
 use wgpu::BindGroup;
 
 use crate::camera::ModelMatrices;
-use crate::gpu::{context::Context, Mesh, Shader};
+use crate::gpu::{context::Context, Mesh};
 use crate::Material;
 
 pub(crate) struct DrawCall<'a> {

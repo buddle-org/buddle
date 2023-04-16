@@ -13,7 +13,7 @@ const FLAT_TEXTURE: &str = include_str!("shaders/flat_texture.wgsl");
 
 fn main() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new().with_title("buddle").build(&event_loop).unwrap();
 
     let physical_size = window.inner_size();
     let mut ctx = Context::new(

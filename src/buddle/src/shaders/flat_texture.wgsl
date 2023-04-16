@@ -9,9 +9,10 @@ struct VertexOutput {
     @location(0) tex_coords: vec2<f32>,
 };
 
-struct CameraMatrices {
+struct CameraData {
     view_matrix: mat4x4<f32>,
-    proj_matrix: mat4x4<f32>
+    proj_matrix: mat4x4<f32>,
+    position: vec3<f32>,
 };
 
 struct ModelMatrices {
@@ -21,7 +22,7 @@ struct ModelMatrices {
 };
 
 @group(0) @binding(0)
-var<uniform> camera: CameraMatrices;
+var<uniform> camera: CameraData;
 
 @group(1) @binding(0)
 var<uniform> model: ModelMatrices;

@@ -1,6 +1,6 @@
 //! Representation of a camera in 3D-space
 
-use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform, Vector3};
+use cgmath::{EuclideanSpace, Matrix, Matrix4, Point3, SquareMatrix, Transform, Vector3};
 use wgpu::{BindGroup, Buffer, BufferUsages};
 
 use crate::gpu::{Context, RenderBuffer};
@@ -55,7 +55,8 @@ impl Camera {
     }
 
     pub fn rasterize(self, ctx: &Context) -> Rasterizer {
-        let camera_matrices = CameraMatrices::new(Matrix4::identity(), Matrix4::identity());
+        let camera_matrices =
+            CameraData::new(Matrix4::identity(), Matrix4::identity(), Point3::origin());
         let camera_buffer = ctx.create_buffer(
             &[camera_matrices],
             BufferUsages::UNIFORM | BufferUsages::COPY_DST,
@@ -121,7 +122,11 @@ impl Rasterizer {
 
         ctx.update_buffer(
             &self.camera_buffer,
-            &[CameraMatrices::new(view_matrix, proj_matrix)],
+            &[CameraData::new(
+                view_matrix,
+                proj_matrix,
+                self.camera.position,
+            )],
         );
 
         RenderBuffer::new(&self.camera_bind_group, view_matrix, final_proj_mat)
@@ -130,16 +135,22 @@ impl Rasterizer {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct CameraMatrices {
+pub(crate) struct CameraData {
     view_matrix: [[f32; 4]; 4],
     proj_matrix: [[f32; 4]; 4],
+    position: [f32; 3],
 }
 
-impl CameraMatrices {
-    pub fn new(view_matrix: Matrix4<f32>, proj_matrix: Matrix4<f32>) -> Self {
+impl CameraData {
+    pub fn new(
+        view_matrix: Matrix4<f32>,
+        proj_matrix: Matrix4<f32>,
+        position: Point3<f32>,
+    ) -> Self {
         Self {
             view_matrix: view_matrix.into(),
             proj_matrix: proj_matrix.into(),
+            position: position.into(),
         }
     }
 }

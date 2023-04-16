@@ -1,12 +1,14 @@
 [package]
 name = "buddle"
 version = "0.1.0"
-authors = ["Valentin B. <valentin.be@protonmail.com>"]
+authors = ["Valentin B. <valentin.be@protonmail.com>", "Nikolas Wipper <nik.wipper@gmx.de>"]
 license = "GPL-2.0"
 repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
+cgmath = "0.18"
+winit = "0.28"
 buddle-net = { path = "../buddle-net" }
 buddle-nif = { path = "../buddle-nif" }
 buddle-render = { path = "../buddle-render" }

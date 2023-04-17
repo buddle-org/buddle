@@ -9,3 +9,6 @@ pub use descriptors::*;
 
 mod render_buffer;
 pub use render_buffer::*;
+
+mod shader;
+pub(crate) use shader::*;

@@ -1,8 +1,9 @@
 //! Interfaces with the GPU
 
-use cgmath::{Matrix4, SquareMatrix, Vector2};
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
+
+use buddle_math::{Mat4, UVec2};
 
 use crate::camera::ModelMatrices;
 use crate::gpu::*;
@@ -15,10 +16,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new<W: HasRawWindowHandle + HasRawDisplayHandle>(
-        window: &W,
-        size: Vector2<u32>,
-    ) -> Self {
+    pub fn new<W: HasRawWindowHandle + HasRawDisplayHandle>(window: &W, size: UVec2) -> Self {
         // The instance is a handle to our GPU
         // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -76,7 +74,7 @@ impl Context {
     }
 
     /// Resizes the internal surface
-    pub fn resize(&mut self, new_size: Vector2<u32>) {
+    pub fn resize(&mut self, new_size: UVec2) {
         if new_size.x > 0 && new_size.y > 0 {
             self.surface.config.width = new_size.x;
             self.surface.config.height = new_size.y;
@@ -121,9 +119,9 @@ impl Context {
         let index_buffer = self.create_buffer(indices, wgpu::BufferUsages::INDEX);
         let model_buffer = self.create_buffer(
             &[ModelMatrices::new(
-                Matrix4::identity(),
-                Matrix4::identity(),
-                Matrix4::identity(),
+                Mat4::IDENTITY,
+                Mat4::IDENTITY,
+                Mat4::IDENTITY,
             )],
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
@@ -168,7 +166,7 @@ impl Context {
         Shader { module, pipeline }
     }
 
-    pub fn create_texture(&self, rgba8: &[u8], size: Vector2<u32>) -> Texture {
+    pub fn create_texture(&self, rgba8: &[u8], size: UVec2) -> Texture {
         let texture_size = wgpu::Extent3d {
             width: size.x,
             height: size.y,
@@ -360,7 +358,7 @@ impl Context {
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
+                    front_face: wgpu::FrontFace::Cw,
                     cull_mode: Some(wgpu::Face::Back),
                     // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                     polygon_mode: if config.wireframe {
@@ -427,7 +425,7 @@ impl Context {
             view,
             sampler,
             dimensions: TextureDimensions::D2,
-            size: Vector2::new(config.width, config.height),
+            size: UVec2::new(config.width, config.height),
         };
 
         inner

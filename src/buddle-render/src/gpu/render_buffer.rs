@@ -1,7 +1,7 @@
 //! Batches and dispatches draw calls to the GPU
 
-use cgmath::{Matrix4, Vector4, Zero};
 use wgpu::BindGroup;
+use buddle_math::{Mat4, Vec4};
 
 use crate::camera::ModelMatrices;
 use crate::gpu::{context::Context, Mesh};
@@ -10,33 +10,33 @@ use crate::Material;
 pub(crate) struct DrawCall<'a> {
     mesh: &'a Mesh,
     material: &'a Material,
-    model_matrix: Matrix4<f32>,
+    model_matrix: Mat4,
 }
 
 pub struct RenderBuffer<'a, 'b> {
     pub(crate) draw_calls: Vec<DrawCall<'a>>,
-    pub(crate) clear_color: Vector4<f32>,
+    pub(crate) clear_color: Vec4,
     camera_bind_group: &'b BindGroup,
-    view_mat: Matrix4<f32>,
-    proj_mat: Matrix4<f32>,
+    view_mat: Mat4,
+    proj_mat: Mat4,
 }
 
 impl<'a, 'b> RenderBuffer<'a, 'b> {
     pub fn new(
         camera_bind_group: &'b BindGroup,
-        view_mat: Matrix4<f32>,
-        proj_mat: Matrix4<f32>,
+        view_mat: Mat4,
+        proj_mat: Mat4,
     ) -> Self {
         RenderBuffer {
             draw_calls: Vec::new(),
-            clear_color: Vector4::<f32>::zero(),
+            clear_color: Vec4::ZERO,
             camera_bind_group,
             view_mat,
             proj_mat,
         }
     }
 
-    pub fn set_clear_color(&mut self, color: Vector4<f32>) {
+    pub fn set_clear_color(&mut self, color: Vec4) {
         self.clear_color = color;
     }
 
@@ -47,7 +47,7 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
         &mut self,
         mesh: &'a Mesh,
         material: &'a Material,
-        model_matrix: Matrix4<f32>,
+        model_matrix: Mat4,
     ) {
         self.draw_calls.push(DrawCall {
             mesh,

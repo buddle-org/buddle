@@ -4,6 +4,8 @@
 //! In particular, this crate targets versions `20.2.0.7`,
 //! `20.2.0.8`, and `20.6.0.0` of the format.
 
+#![feature(slice_take)]
+
 pub mod basic;
 use self::basic::FileVersion;
 

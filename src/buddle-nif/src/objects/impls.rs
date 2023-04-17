@@ -1,3 +1,5 @@
+use buddle_math::{Vec2, Vec3};
+
 use super::*;
 
 impl NiObject {
@@ -28,10 +30,9 @@ impl NiObject {
             .map(|refs| refs.iter().filter_map(|r| r.get(blocks)).collect())
     }
 
-    /// Gets a list of property references stored in this
-    /// block, if any.
-    pub fn property_refs(&self) -> Option<&[Ref<NiProperty>]> {
-        let niavobject = match self {
+    /// Gets the AVObject part of an object, if it exists
+    pub fn avobject(&self) -> Option<&NiAVObject> {
+        match self {
             NiObject::NiAVObject(block) => Some(block),
             NiObject::NiDynamicEffect(block) => Some(&block.base),
             NiObject::NiLight(block) => Some(&block.base.base),
@@ -71,7 +72,13 @@ impl NiObject {
             NiObject::NiPSMeshParticleSystem(block) => Some(&block.base.base.base.base),
             NiObject::NiMeshHWInstance(block) => Some(&block.base),
             _ => None,
-        };
+        }
+    }
+
+    /// Gets a list of property references stored in this
+    /// block, if any.
+    pub fn property_refs(&self) -> Option<&[Ref<NiProperty>]> {
+        let niavobject = self.avobject();
 
         niavobject.map(|n| n.properties.as_slice())
     }
@@ -158,5 +165,46 @@ impl NiObject {
     pub fn extra_data<'b>(&self, blocks: &'b [NiObject]) -> Option<Vec<&'b NiObject>> {
         self.extra_data_refs()
             .map(|refs| refs.iter().filter_map(|r| r.get(blocks)).collect())
+    }
+}
+
+impl NiDataStream {
+    pub fn read_with<P, T: Copy, F: Fn(&mut &[P]) -> T>(&self, reader: F) -> Vec<Vec<T>> {
+        let slice = self.data.as_slice();
+        let mut stream =
+            unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const P, slice.len()) };
+        let mut res = Vec::with_capacity(self.regions.len());
+        for region in &self.regions {
+            let mut reg = Vec::with_capacity(region.num_indices as usize);
+
+            for _ in 0..region.num_indices {
+                reg.push(reader(&mut stream));
+            }
+
+            res.push(reg);
+        }
+
+        res
+    }
+
+    pub fn read_primitive<T: Copy>(&self) -> Vec<Vec<T>> {
+        self.read_with(|prims| *prims.take_first().unwrap())
+    }
+
+    pub fn read_vec2(&self) -> Vec<Vec<Vec2>> {
+        self.read_with(|floats| {
+            let x = *floats.take_first().unwrap();
+            let y = *floats.take_first().unwrap();
+            Vec2::new(x, y)
+        })
+    }
+
+    pub fn read_vec3(&self) -> Vec<Vec<Vec3>> {
+        self.read_with(|floats| {
+            let x = *floats.take_first().unwrap();
+            let y = *floats.take_first().unwrap();
+            let z = *floats.take_first().unwrap();
+            Vec3::new(x, y, z)
+        })
     }
 }

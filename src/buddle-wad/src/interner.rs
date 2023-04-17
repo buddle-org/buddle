@@ -73,6 +73,18 @@ impl<A: AsRef<Archive>> Interner<A> {
         })
     }
 
+    pub fn fetch_mut(&mut self, handle: FileHandle) -> Option<&mut [u8]> {
+        let inner = &mut self.inner;
+        (handle.1 == inner.invalidation_count).then(|| {
+            let idx = handle.0 as usize;
+
+            let start = inner.ends.get(idx.wrapping_sub(1)).copied().unwrap_or(0);
+            let end = inner.ends[idx];
+
+            &mut inner.buf[start..end]
+        })
+    }
+
     /// Interns a file named `file` from the [`Archive`].
     ///
     /// Returns the [`FileHandle`] associated with the file on success,

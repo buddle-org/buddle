@@ -1,6 +1,6 @@
 //! Type abstractions
 
-use cgmath::Vector2;
+use buddle_math::UVec2;
 
 use crate::TextureDimensions;
 
@@ -25,7 +25,7 @@ pub struct Texture {
     pub(crate) view: wgpu::TextureView,
     pub(crate) sampler: wgpu::Sampler,
     pub(crate) dimensions: TextureDimensions,
-    pub(crate) size: Vector2<u32>,
+    pub(crate) size: UVec2,
 }
 
 pub struct Mesh {

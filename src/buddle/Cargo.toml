@@ -7,10 +7,11 @@ repository = "https://github.com/buddle-org/buddle.git"
 edition = "2021"
 
 [dependencies]
-cgmath = "0.18"
-winit = "0.28"
+buddle-math = { path = "../buddle-math" }
 buddle-net = { path = "../buddle-net" }
 buddle-nif = { path = "../buddle-nif" }
 buddle-render = { path = "../buddle-render" }
 buddle-object-property = { path = "../buddle-object-property" }
 buddle-wad = { path = "../buddle-wad" }
+
+winit = "0.28"

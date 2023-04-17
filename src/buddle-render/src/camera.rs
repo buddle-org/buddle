@@ -1,7 +1,8 @@
 //! Representation of a camera in 3D-space
 
-use cgmath::{EuclideanSpace, Matrix, Matrix4, Point3, SquareMatrix, Transform, Vector3};
 use wgpu::{BindGroup, Buffer, BufferUsages};
+
+use buddle_math::{Mat4, Vec3};
 
 use crate::gpu::{Context, RenderBuffer};
 use crate::BindGroupLayoutEntry;
@@ -14,9 +15,9 @@ pub enum CameraType {
 
 #[derive(Copy, Clone)]
 pub struct Camera {
-    pub position: Point3<f32>,
-    pub target: Point3<f32>,
-    pub up: Vector3<f32>,
+    pub position: Vec3,
+    pub target: Vec3,
+    pub up: Vec3,
     pub fov: f32,
     pub cull_near: f32,
     pub cull_far: f32,
@@ -30,11 +31,11 @@ pub struct Rasterizer {
 }
 
 impl Camera {
-    pub fn perspective(position: Point3<f32>, target: Point3<f32>, fov: f32) -> Self {
+    pub fn perspective(position: Vec3, target: Vec3, fov: f32) -> Self {
         Camera {
             position,
             target,
-            up: Vector3::unit_y(),
+            up: Vec3::Y,
             fov,
             cull_near: 0.01,
             cull_far: 1000.0,
@@ -42,11 +43,11 @@ impl Camera {
         }
     }
 
-    pub fn orthographic(position: Point3<f32>, target: Point3<f32>, near_plane_width: f32) -> Self {
+    pub fn orthographic(position: Vec3, target: Vec3, near_plane_width: f32) -> Self {
         Camera {
             position,
             target,
-            up: Vector3::unit_y(),
+            up: Vec3::Y,
             fov: near_plane_width,
             cull_near: 0.01,
             cull_far: 1000.0,
@@ -55,8 +56,7 @@ impl Camera {
     }
 
     pub fn rasterize(self, ctx: &Context) -> Rasterizer {
-        let camera_matrices =
-            CameraData::new(Matrix4::identity(), Matrix4::identity(), Point3::origin());
+        let camera_matrices = CameraData::new(Mat4::IDENTITY, Mat4::IDENTITY, Vec3::ZERO);
         let camera_buffer = ctx.create_buffer(
             &[camera_matrices],
             BufferUsages::UNIFORM | BufferUsages::COPY_DST,
@@ -82,17 +82,13 @@ impl Rasterizer {
         let aspect = ctx.surface.config.width as f32 / ctx.surface.config.height as f32;
 
         let view_matrix =
-            Matrix4::look_at_rh(self.camera.position, self.camera.target, self.camera.up);
+            Mat4::look_at_rh(self.camera.position, self.camera.target, self.camera.up);
         let proj_matrix;
         if self.camera.cam_type == CameraType::Perspective {
-            let top = self.camera.cull_near * (self.camera.fov * 0.5).to_radians().tan();
-            let right = top * aspect;
 
-            proj_matrix = cgmath::frustum(
-                -right,
-                right,
-                -top,
-                top,
+            proj_matrix = Mat4::perspective_rh_gl(
+                self.camera.fov.to_radians(),
+                aspect,
                 self.camera.cull_near,
                 self.camera.cull_far,
             );
@@ -100,7 +96,7 @@ impl Rasterizer {
             let top = self.camera.fov / 2.0;
             let right = top * aspect;
 
-            proj_matrix = cgmath::ortho(
+            proj_matrix = Mat4::orthographic_rh_gl(
                 -right,
                 right,
                 -top,
@@ -111,12 +107,12 @@ impl Rasterizer {
         }
 
         #[rustfmt::skip]
-        pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
+        pub const OPENGL_TO_WGPU_MATRIX: Mat4 = Mat4::from_cols_slice(&[
             1.0, 0.0, 0.0, 0.0,
             0.0, 1.0, 0.0, 0.0,
             0.0, 0.0, 0.5, 0.0,
             0.0, 0.0, 0.5, 1.0,
-        );
+        ]);
 
         let final_proj_mat = OPENGL_TO_WGPU_MATRIX * proj_matrix;
 
@@ -143,14 +139,14 @@ pub(crate) struct CameraData {
 
 impl CameraData {
     pub fn new(
-        view_matrix: Matrix4<f32>,
-        proj_matrix: Matrix4<f32>,
-        position: Point3<f32>,
+        view_matrix: Mat4,
+        proj_matrix: Mat4,
+        position: Vec3,
     ) -> Self {
         Self {
-            view_matrix: view_matrix.into(),
-            proj_matrix: proj_matrix.into(),
-            position: position.into(),
+            view_matrix: view_matrix.to_cols_array_2d(),
+            proj_matrix: proj_matrix.to_cols_array_2d(),
+            position: position.to_array(),
         }
     }
 }
@@ -165,20 +161,19 @@ pub(crate) struct ModelMatrices {
 
 impl ModelMatrices {
     pub fn new(
-        view_matrix: Matrix4<f32>,
-        proj_matrix: Matrix4<f32>,
-        model_matrix: Matrix4<f32>,
+        view_matrix: Mat4,
+        proj_matrix: Mat4,
+        model_matrix: Mat4,
     ) -> Self {
         let model_view_matrix = view_matrix * model_matrix;
 
         Self {
-            mvp: ((proj_matrix * view_matrix) * model_matrix).into(),
-            model_matrix: model_matrix.into(),
+            mvp: ((proj_matrix * view_matrix) * model_matrix).to_cols_array_2d(),
+            model_matrix: model_matrix.to_cols_array_2d(),
             normal_matrix: model_view_matrix
-                .inverse_transform()
-                .unwrap()
+                .inverse()
                 .transpose()
-                .into(),
+                .to_cols_array_2d(),
         }
     }
 }

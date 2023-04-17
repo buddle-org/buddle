@@ -74,7 +74,13 @@ impl<T: 'static> Ref<T> {
     /// Gets the referenced type as a raw [`NiObject`] out of
     /// the full block list.
     pub fn get<'b>(&self, blocks: &'b [NiObject]) -> Option<&'b NiObject> {
-        (self.0 >= 0).then(|| &blocks[self.0 as usize])
+        (self.0 >= 0 && (self.0 as usize) < blocks.len()).then(|| &blocks[self.0 as usize])
+    }
+
+    pub fn get_or<'b, E>(&self, blocks: &'b [NiObject], err: E) -> Result<&'b NiObject, E> {
+        (self.0 >= 0 && (self.0 as usize) < blocks.len())
+            .then(|| &blocks[self.0 as usize])
+            .ok_or(err)
     }
 }
 

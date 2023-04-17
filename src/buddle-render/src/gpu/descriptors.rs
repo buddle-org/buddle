@@ -1,16 +1,29 @@
 //! Describing what we want and have to the GPU
 
+
+use buddle_math::{Vec2, Vec3};
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 3],
+    pub normal: [f32; 3],
     pub tex_coords: [f32; 2],
 }
 
 impl Vertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2];
+    const ATTRIBS: [wgpu::VertexAttribute; 4] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x3, 3 => Float32x2];
+
+    pub fn new(position: Vec3, color: Vec3, normal: Vec3, tex_coords: Vec2) -> Self {
+        Self {
+            position: position.into(),
+            color: color.into(),
+            normal: normal.into(),
+            tex_coords: tex_coords.into()
+        }
+    }
 
     pub(crate) fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {

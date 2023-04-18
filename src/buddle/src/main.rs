@@ -5,11 +5,11 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 
-use buddle_math::{Mat4, UVec2, Vec3};
+use buddle_math::{Mat4, UVec2, Vec3, Vec4};
 use buddle_nif::Nif;
-use buddle_render::Camera;
 use buddle_render::Context;
 use buddle_render::Model;
+use buddle_render::{Camera, FlatMaterial, Material, Mesh};
 use buddle_wad::{Archive, Interner};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -43,6 +43,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let model = Model::from_nif(&ctx, owl_gamma).unwrap();
 
+    let texture = ctx.create_render_texture(UVec2::new(1024, 1024));
+
+    let mut rb = rast.new_frame(&ctx);
+    rb.set_clear_color(Vec4::new(1.0, 1.0, 1.0, 1.0));
+
+    model.render_to(&mut rb, Mat4::from_rotation_y(180.0f32.to_radians()));
+
+    rb.render_to_texture(&ctx, &texture);
+
+    let material: Box<dyn Material> = Box::new(FlatMaterial::new(&ctx, &texture.texture));
+    let mesh = Mesh::make_plane(&ctx);
+    let plane = Model::from_mesh(mesh, material);
+
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
 
@@ -64,6 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut rb = rast.new_frame(&ctx);
 
                 model.render_to(&mut rb, Mat4::from_rotation_y(180.0f32.to_radians()));
+                plane.render_to(&mut rb, Mat4::from_scale(Vec3::splat(50.0)));
 
                 rb.submit(&ctx).unwrap();
             }

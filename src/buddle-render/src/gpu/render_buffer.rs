@@ -1,10 +1,12 @@
 //! Batches and dispatches draw calls to the GPU
 
+use wgpu::TextureView;
+
 use buddle_math::{Mat4, Vec4};
 
 use crate::camera::ModelMatrices;
 use crate::gpu::{context::Context, Mesh};
-use crate::Material;
+use crate::{Material, RenderTexture};
 
 pub(crate) struct DrawCall<'a> {
     mesh: &'a Mesh,
@@ -51,27 +53,11 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
         });
     }
 
-    pub fn submit(self, ctx: &Context) -> Result<(), ()> {
-        let output_res = ctx.surface.surface.get_current_texture();
+    pub fn render_to_texture(&self, ctx: &Context, texture: &RenderTexture) {
+        self.render_to_texture_view(ctx, &texture.texture.view, &texture.depth.view)
+    }
 
-        if output_res.is_err() {
-            match output_res {
-                // Reconfigure the surface if lost
-                Err(wgpu::SurfaceError::Lost) => ctx.reconfigure(),
-                // The system is out of memory, we should probably quit
-                Err(wgpu::SurfaceError::OutOfMemory) => return Err(()),
-                // All other errors (Outdated, Timeout) should be resolved by the next frame
-                Err(e) => eprintln!("{:?}", e),
-                _ => unreachable!(),
-            }
-            return self.submit(ctx);
-        }
-
-        let output = output_res.unwrap();
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
+    fn render_to_texture_view(&self, ctx: &Context, view: &TextureView, depth: &TextureView) {
         let mut encoder = ctx
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -95,7 +81,7 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &ctx.depth_buffer.view,
+                    view: &depth,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: true,
@@ -104,7 +90,7 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
                 }),
             });
 
-            for draw_call in self.draw_calls {
+            for draw_call in &self.draw_calls {
                 ctx.update_buffer(
                     &draw_call.mesh.model_buffer,
                     &[ModelMatrices::new(
@@ -131,6 +117,31 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
         }
 
         ctx.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    pub fn submit(self, ctx: &Context) -> Result<(), ()> {
+        let output_res = ctx.surface.surface.get_current_texture();
+
+        if output_res.is_err() {
+            match output_res {
+                // Reconfigure the surface if lost
+                Err(wgpu::SurfaceError::Lost) => ctx.reconfigure(),
+                // The system is out of memory, we should probably quit
+                Err(wgpu::SurfaceError::OutOfMemory) => return Err(()),
+                // All other errors (Outdated, Timeout) should be resolved by the next frame
+                Err(e) => eprintln!("{:?}", e),
+                _ => unreachable!(),
+            }
+            return self.submit(ctx);
+        }
+
+        let output = output_res.unwrap();
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.render_to_texture_view(ctx, &view, &ctx.depth_buffer.view);
+
         output.present();
 
         Ok(())

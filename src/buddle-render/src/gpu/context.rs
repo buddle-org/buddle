@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
 
@@ -16,7 +17,7 @@ pub struct Context {
     pub(crate) queue: wgpu::Queue,
     pub(crate) surface: Surface,
     pub(crate) depth_buffer: Texture,
-     shader_cache: RefCell<HashMap<&'static str, Rc<Shader>>>
+    shader_cache: RefCell<HashMap<&'static str, Rc<Shader>>>,
 }
 
 impl Context {
@@ -67,14 +68,14 @@ impl Context {
         };
         surface.configure(&device, &config);
 
-        let depth_buffer = Self::create_depth_texture(&device, &config);
+        let depth_buffer = Self::create_surface_depth_texture(&device, &config);
 
         Context {
             device,
             queue,
             surface: Surface { surface, config },
             depth_buffer,
-            shader_cache: RefCell::new(HashMap::new())
+            shader_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -84,7 +85,8 @@ impl Context {
             self.surface.config.width = new_size.x;
             self.surface.config.height = new_size.y;
 
-            self.depth_buffer = Self::create_depth_texture(&self.device, &self.surface.config);
+            self.depth_buffer =
+                Self::create_surface_depth_texture(&self.device, &self.surface.config);
 
             self.reconfigure();
         }
@@ -177,28 +179,39 @@ impl Context {
         shader
     }
 
-    pub fn create_texture(&self, rgba8: &[u8], size: UVec2) -> Texture {
-        let texture_size = wgpu::Extent3d {
-            width: size.x,
-            height: size.y,
-            depth_or_array_layers: 1,
-        };
+    pub fn create_render_texture(&self, size: UVec2) -> RenderTexture {
+        RenderTexture {
+            texture: Self::create_empty_texture(
+                &self.device,
+                size,
+                self.surface.config.format,
+                wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST,
+            ),
+            depth: Self::create_empty_texture(
+                &self.device,
+                size,
+                wgpu::TextureFormat::Depth32Float,
+                wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_DST,
+            ),
+        }
+    }
 
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            size: texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            label: Some("Texture"),
-            view_formats: &[],
-        });
+    pub fn create_texture(&self, rgba8: &[u8], size: UVec2) -> Texture {
+        let texture = Self::create_empty_texture(
+            &self.device,
+            size,
+            wgpu::TextureFormat::Rgba8UnormSrgb,
+            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        );
 
         self.queue.write_texture(
             // Tells wgpu where to copy the pixel data
             wgpu::ImageCopyTexture {
-                texture: &texture,
+                texture: &texture.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -211,33 +224,14 @@ impl Context {
                 bytes_per_row: std::num::NonZeroU32::new(4 * size.x),
                 rows_per_image: std::num::NonZeroU32::new(size.y),
             },
-            texture_size,
+            wgpu::Extent3d {
+                width: size.x,
+                height: size.y,
+                depth_or_array_layers: 1,
+            },
         );
 
-        // We don't need to configure the texture view much, so let's
-        // let wgpu define it.
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            // todo: properly control address mode
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            // todo: properly control filtering mode
-            min_filter: wgpu::FilterMode::Nearest,
-            mag_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
-        let inner = Texture {
-            texture,
-            view,
-            sampler,
-            dimensions: TextureDimensions::D2,
-            size,
-        };
-
-        inner
+        texture
     }
 
     pub fn create_bind_group_layout(
@@ -382,20 +376,25 @@ impl Context {
             })
     }
 
-    fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Texture {
-        let size = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
+    fn create_empty_texture(
+        device: &wgpu::Device,
+        size: UVec2,
+        format: wgpu::TextureFormat,
+        usage: wgpu::TextureUsages,
+    ) -> Texture {
+        let extend = wgpu::Extent3d {
+            width: size.x,
+            height: size.y,
             depth_or_array_layers: 1,
         };
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size,
+            size: extend,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            format,
+            usage,
             label: Some("Depth texture"),
             view_formats: &[],
         });
@@ -408,18 +407,27 @@ impl Context {
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
-            compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         });
 
-        let inner = Texture {
+        Texture {
             texture,
             view,
             sampler,
             dimensions: TextureDimensions::D2,
-            size: UVec2::new(config.width, config.height),
-        };
+            size,
+        }
+    }
 
-        inner
+    fn create_surface_depth_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> Texture {
+        Self::create_empty_texture(
+            device,
+            UVec2::new(config.width, config.height),
+            wgpu::TextureFormat::Depth32Float,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        )
     }
 }

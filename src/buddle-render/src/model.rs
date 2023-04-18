@@ -9,15 +9,12 @@ use buddle_nif::enums::PixelFormat;
 use buddle_nif::objects::{NiAVObject, NiObject};
 use buddle_nif::Nif;
 
-use crate::gpu::FLAT_TEXTURE;
-use crate::{
-    BindGroupLayoutEntry, Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture,
-    TextureDimensions, Transform, Vertex,
-};
+use crate::{Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture, Transform, Vertex};
 
 pub struct Model {
     meshes: Vec<Mesh>,
     materials: Vec<Box<dyn Material>>,
+    owned_textures: Vec<Texture>,
 }
 
 // Todo: Speedups
@@ -143,9 +140,18 @@ impl Texture {
 }
 
 impl Model {
+    pub fn from_mesh(mesh: Mesh, material: Box<dyn Material>) -> Self {
+        Model {
+            meshes: vec![mesh],
+            materials: vec![material],
+            owned_textures: vec![],
+        }
+    }
+
     pub fn from_nif(ctx: &Context, nif: Nif) -> Result<Self, ()> {
         let mut meshes = Vec::new();
         let mut materials = Vec::new();
+        let mut textures = Vec::new();
 
         let ni_meshes = get_meshes_with_transforms(&nif);
 
@@ -231,27 +237,21 @@ impl Model {
                     break;
                 }
             }
-
-            let shader = ctx.create_shader(
-                FLAT_TEXTURE,
-                vec![
-                    &ctx.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
-                    &ctx.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
-                    &ctx.create_bind_group_layout(vec![
-                        BindGroupLayoutEntry::Texture(TextureDimensions::D2),
-                        BindGroupLayoutEntry::Sampler,
-                    ]),
-                ],
-            );
-            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, shader, texture?));
+            let texture = texture?;
+            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, &texture));
 
             let mesh = ctx.create_mesh(&vertices, &indices);
 
             meshes.push(mesh);
             materials.push(material);
+            textures.push(texture);
         }
 
-        Ok(Model { meshes, materials })
+        Ok(Model {
+            meshes,
+            materials,
+            owned_textures: textures,
+        })
     }
 
     pub fn render_to<'a, 'b>(

@@ -229,25 +229,6 @@ impl Context {
         inner
     }
 
-    pub fn create_material(&self, shader: Shader, diffuse: Texture) -> Material {
-        let bind_group = self.create_bind_group(
-            self.create_bind_group_layout(vec![
-                BindGroupLayoutEntry::Texture(diffuse.dimensions),
-                BindGroupLayoutEntry::Sampler,
-            ]),
-            vec![
-                wgpu::BindingResource::TextureView(&diffuse.view),
-                wgpu::BindingResource::Sampler(&diffuse.sampler),
-            ],
-        );
-
-        Material {
-            shader,
-            diffuse,
-            bind_group,
-        }
-    }
-
     pub fn create_bind_group_layout(
         &self,
         layout: Vec<BindGroupLayoutEntry>,

@@ -11,13 +11,13 @@ use buddle_nif::Nif;
 
 use crate::gpu::FLAT_TEXTURE;
 use crate::{
-    BindGroupLayoutEntry, Context, Material, Mesh, RenderBuffer, Texture, TextureDimensions,
-    Transform, Vertex,
+    BindGroupLayoutEntry, Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture,
+    TextureDimensions, Transform, Vertex,
 };
 
 pub struct Model {
     meshes: Vec<Mesh>,
-    materials: Vec<Material>,
+    materials: Vec<Box<dyn Material>>,
 }
 
 // Todo: Speedups
@@ -243,7 +243,7 @@ impl Model {
                     ]),
                 ],
             );
-            let material = ctx.create_material(shader, texture?);
+            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, shader, texture?));
 
             let mesh = ctx.create_mesh(&vertices, &indices);
 

@@ -35,9 +35,3 @@ pub struct Mesh {
     pub(crate) model_buffer: wgpu::Buffer,
     pub(crate) model_bind_group: wgpu::BindGroup,
 }
-
-pub struct Material {
-    pub(crate) shader: Shader,
-    pub(crate) diffuse: Texture,
-    pub(crate) bind_group: wgpu::BindGroup,
-}

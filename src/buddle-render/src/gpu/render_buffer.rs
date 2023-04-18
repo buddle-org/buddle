@@ -1,6 +1,7 @@
 //! Batches and dispatches draw calls to the GPU
 
 use wgpu::BindGroup;
+
 use buddle_math::{Mat4, Vec4};
 
 use crate::camera::ModelMatrices;
@@ -9,7 +10,7 @@ use crate::Material;
 
 pub(crate) struct DrawCall<'a> {
     mesh: &'a Mesh,
-    material: &'a Material,
+    material: &'a Box<dyn Material>,
     model_matrix: Mat4,
 }
 
@@ -22,11 +23,7 @@ pub struct RenderBuffer<'a, 'b> {
 }
 
 impl<'a, 'b> RenderBuffer<'a, 'b> {
-    pub fn new(
-        camera_bind_group: &'b BindGroup,
-        view_mat: Mat4,
-        proj_mat: Mat4,
-    ) -> Self {
+    pub fn new(camera_bind_group: &'b BindGroup, view_mat: Mat4, proj_mat: Mat4) -> Self {
         RenderBuffer {
             draw_calls: Vec::new(),
             clear_color: Vec4::ZERO,
@@ -46,7 +43,7 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
     pub fn add_draw_call(
         &mut self,
         mesh: &'a Mesh,
-        material: &'a Material,
+        material: &'a Box<dyn Material>,
         model_matrix: Mat4,
     ) {
         self.draw_calls.push(DrawCall {
@@ -119,11 +116,11 @@ impl<'a, 'b> RenderBuffer<'a, 'b> {
                     )],
                 );
 
-                render_pass.set_pipeline(&draw_call.material.shader.pipeline);
+                render_pass.set_pipeline(&draw_call.material.get_shader().pipeline);
 
                 render_pass.set_bind_group(0, self.camera_bind_group, &[]);
                 render_pass.set_bind_group(1, &draw_call.mesh.model_bind_group, &[]);
-                render_pass.set_bind_group(2, &draw_call.material.bind_group, &[]);
+                render_pass.set_bind_group(2, &draw_call.material.get_bind_group(), &[]);
 
                 render_pass.set_vertex_buffer(0, draw_call.mesh.vertex_buffer.slice(..));
                 render_pass.set_index_buffer(

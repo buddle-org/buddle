@@ -1,18 +1,19 @@
+use std::rc::Rc;
 use crate::{BindGroupLayoutEntry, Context, Shader, Texture};
 
 pub trait Material {
-    fn get_shader(&self) -> &Shader;
+    fn get_shader(&self) -> &Rc<Shader>;
     fn get_bind_group(&self) -> &wgpu::BindGroup;
 }
 
 pub struct FlatMaterial {
-    pub(crate) shader: Shader,
+    pub(crate) shader: Rc<Shader>,
     pub(crate) diffuse: Texture,
     pub(crate) bind_group: wgpu::BindGroup,
 }
 
 impl FlatMaterial {
-    pub fn new(ctx: &Context, shader: Shader, diffuse: Texture) -> Self {
+    pub fn new(ctx: &Context, shader: Rc<Shader>, diffuse: Texture) -> Self {
         let bind_group = ctx.create_bind_group(
             ctx.create_bind_group_layout(vec![
                 BindGroupLayoutEntry::Texture(diffuse.dimensions),
@@ -33,7 +34,7 @@ impl FlatMaterial {
 }
 
 impl Material for FlatMaterial {
-    fn get_shader(&self) -> &Shader {
+    fn get_shader(&self) -> &Rc<Shader> {
         &self.shader
     }
 

@@ -1,5 +1,8 @@
 //! Interfaces with the GPU
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use wgpu::util::DeviceExt;
 
@@ -13,6 +16,7 @@ pub struct Context {
     pub(crate) queue: wgpu::Queue,
     pub(crate) surface: Surface,
     pub(crate) depth_buffer: Texture,
+     shader_cache: RefCell<HashMap<&'static str, Rc<Shader>>>
 }
 
 impl Context {
@@ -70,6 +74,7 @@ impl Context {
             queue,
             surface: Surface { surface, config },
             depth_buffer,
+            shader_cache: RefCell::new(HashMap::new())
         }
     }
 
@@ -142,9 +147,13 @@ impl Context {
     /// Creates a new [Shader]
     pub fn create_shader(
         &self,
-        code: &str,
+        code: &'static str,
         bind_group_layouts: Vec<&wgpu::BindGroupLayout>,
-    ) -> Shader {
+    ) -> Rc<Shader> {
+        if let Some(shader) = self.shader_cache.borrow().get(code) {
+            return shader.clone();
+        }
+
         const GENERIC_PIPELINE_CONFIG: SimplifiedPipelineConfig = SimplifiedPipelineConfig {
             wireframe: false,
             msaa: MSAA::Off,
@@ -163,7 +172,9 @@ impl Context {
             GENERIC_PIPELINE_CONFIG,
         );
 
-        Shader { module, pipeline }
+        let shader = Rc::new(Shader { module, pipeline });
+        self.shader_cache.borrow_mut().insert(code, shader.clone());
+        shader
     }
 
     pub fn create_texture(&self, rgba8: &[u8], size: UVec2) -> Texture {

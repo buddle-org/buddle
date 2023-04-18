@@ -1,7 +1,5 @@
 //! Batches and dispatches draw calls to the GPU
 
-use wgpu::BindGroup;
-
 use buddle_math::{Mat4, Vec4};
 
 use crate::camera::ModelMatrices;
@@ -17,13 +15,13 @@ pub(crate) struct DrawCall<'a> {
 pub struct RenderBuffer<'a, 'b> {
     pub(crate) draw_calls: Vec<DrawCall<'a>>,
     pub(crate) clear_color: Vec4,
-    camera_bind_group: &'b BindGroup,
+    camera_bind_group: &'b wgpu::BindGroup,
     view_mat: Mat4,
     proj_mat: Mat4,
 }
 
 impl<'a, 'b> RenderBuffer<'a, 'b> {
-    pub fn new(camera_bind_group: &'b BindGroup, view_mat: Mat4, proj_mat: Mat4) -> Self {
+    pub fn new(camera_bind_group: &'b wgpu::BindGroup, view_mat: Mat4, proj_mat: Mat4) -> Self {
         RenderBuffer {
             draw_calls: Vec::new(),
             clear_color: Vec4::ZERO,

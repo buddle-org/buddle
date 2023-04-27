@@ -17,7 +17,10 @@ pub struct Context {
     pub(crate) queue: wgpu::Queue,
     pub(crate) surface: Surface,
     pub(crate) depth_buffer: Texture,
-    shader_cache: RefCell<HashMap<&'static str, Rc<Shader>>>,
+    pub(crate) oit_opaque: Texture,
+    pub(crate) oit_accum: Texture,
+    pub(crate) oit_reveal: Texture,
+    shader_cache: RefCell<HashMap<(&'static str, SimplifiedPipelineConfig), Rc<Shader>>>,
 }
 
 impl Context {
@@ -57,7 +60,7 @@ impl Context {
             .unwrap_or(surface_caps.formats[0]);
 
         let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             format: surface_format,
             width: size.x,
             height: size.y,
@@ -69,12 +72,18 @@ impl Context {
         surface.configure(&device, &config);
 
         let depth_buffer = Self::create_surface_depth_texture(&device, &config);
+        let oit_opaque = Self::create_oit_opaque_texture(&device, &config);
+        let oit_accum = Self::create_oit_accum_texture(&device, size);
+        let oit_reveal = Self::create_oit_reveal_texture(&device, size);
 
         Context {
             device,
             queue,
             surface: Surface { surface, config },
             depth_buffer,
+            oit_opaque,
+            oit_accum,
+            oit_reveal,
             shader_cache: RefCell::new(HashMap::new()),
         }
     }
@@ -87,6 +96,9 @@ impl Context {
 
             self.depth_buffer =
                 Self::create_surface_depth_texture(&self.device, &self.surface.config);
+            self.oit_opaque = Self::create_oit_opaque_texture(&self.device, &self.surface.config);
+            self.oit_accum = Self::create_oit_accum_texture(&self.device, new_size);
+            self.oit_reveal = Self::create_oit_reveal_texture(&self.device, new_size);
 
             self.reconfigure();
         }
@@ -133,7 +145,7 @@ impl Context {
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
         let model_bind_group = self.create_bind_group(
-            self.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
+            &self.create_bind_group_layout(vec![BindGroupLayoutEntry::Buffer]),
             vec![model_buffer.as_entire_binding()],
         );
 
@@ -151,15 +163,12 @@ impl Context {
         &self,
         code: &'static str,
         bind_group_layouts: Vec<&wgpu::BindGroupLayout>,
+        config: SimplifiedPipelineConfig,
     ) -> Rc<Shader> {
-        if let Some(shader) = self.shader_cache.borrow().get(code) {
+        if let Some(shader) = self.shader_cache.borrow().get(&(code, config.clone())) {
             return shader.clone();
         }
 
-        const GENERIC_PIPELINE_CONFIG: SimplifiedPipelineConfig = SimplifiedPipelineConfig {
-            wireframe: false,
-            msaa: MSAA::Off,
-        };
         let module = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -167,15 +176,12 @@ impl Context {
                 source: wgpu::ShaderSource::Wgsl(code.into()),
             });
 
-        let pipeline = self.create_pipeline(
-            &module,
-            self.surface.config.format,
-            bind_group_layouts,
-            GENERIC_PIPELINE_CONFIG,
-        );
+        let pipeline = self.create_pipeline(&module, bind_group_layouts, config.clone());
 
         let shader = Rc::new(Shader { module, pipeline });
-        self.shader_cache.borrow_mut().insert(code, shader.clone());
+        self.shader_cache
+            .borrow_mut()
+            .insert((code, config), shader.clone());
         shader
     }
 
@@ -253,23 +259,33 @@ impl Context {
                     count: None,
                 }),
 
-                BindGroupLayoutEntry::Sampler => entries.push(wgpu::BindGroupLayoutEntry {
-                    binding: entries.len() as u32,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                }),
+                BindGroupLayoutEntry::Sampler { filtering } => {
+                    entries.push(wgpu::BindGroupLayoutEntry {
+                        binding: entries.len() as u32,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(if filtering {
+                            wgpu::SamplerBindingType::Filtering
+                        } else {
+                            wgpu::SamplerBindingType::NonFiltering
+                        }),
+                        count: None,
+                    })
+                }
 
-                BindGroupLayoutEntry::Texture(typ) => entries.push(wgpu::BindGroupLayoutEntry {
-                    binding: entries.len() as u32,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: (&typ).into(),
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                }),
+                BindGroupLayoutEntry::Texture { dim, filtering } => {
+                    entries.push(wgpu::BindGroupLayoutEntry {
+                        binding: entries.len() as u32,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: (&dim).into(),
+                            sample_type: wgpu::TextureSampleType::Float {
+                                filterable: filtering,
+                            },
+                        },
+                        count: None,
+                    })
+                }
             }
         }
 
@@ -282,7 +298,7 @@ impl Context {
 
     pub fn create_bind_group(
         &self,
-        layout: wgpu::BindGroupLayout,
+        layout: &wgpu::BindGroupLayout,
         bindings: Vec<wgpu::BindingResource>,
     ) -> wgpu::BindGroup {
         let mut entries = Vec::<wgpu::BindGroupEntry>::new();
@@ -295,7 +311,7 @@ impl Context {
         }
 
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &layout,
+            layout: layout,
             entries: entries.as_slice(),
             label: Some("Bind Group"),
         })
@@ -311,7 +327,6 @@ impl Context {
     fn create_pipeline<'a>(
         &self,
         module: &wgpu::ShaderModule,
-        format: wgpu::TextureFormat,
         bind_group_layouts: Vec<&wgpu::BindGroupLayout>,
         config: SimplifiedPipelineConfig,
     ) -> wgpu::RenderPipeline {
@@ -335,32 +350,30 @@ impl Context {
                 fragment: Some(wgpu::FragmentState {
                     module,
                     entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
+                    targets: config
+                        .targets
+                        .into_iter()
+                        .map(|t| Some(t))
+                        .collect::<Vec<Option<wgpu::ColorTargetState>>>()
+                        .as_slice(),
                 }),
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Cw,
                     cull_mode: Some(wgpu::Face::Back),
-                    // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                     polygon_mode: if config.wireframe {
                         wgpu::PolygonMode::Line
                     } else {
                         wgpu::PolygonMode::Fill
                     },
-                    // Requires Features::DEPTH_CLIP_CONTROL
                     unclipped_depth: false,
-                    // Requires Features::CONSERVATIVE_RASTERIZATION
                     conservative: false,
                 },
-                depth_stencil: Some(wgpu::DepthStencilState {
+                depth_stencil: config.depth_settings.map(|ds| wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: ds.write,
+                    depth_compare: ds.compare,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -399,7 +412,10 @@ impl Context {
             view_formats: &[],
         });
 
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -427,6 +443,36 @@ impl Context {
             device,
             UVec2::new(config.width, config.height),
             wgpu::TextureFormat::Depth32Float,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        )
+    }
+
+    fn create_oit_opaque_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> Texture {
+        Self::create_empty_texture(
+            device,
+            UVec2::new(config.width, config.height),
+            config.format,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        )
+    }
+
+    fn create_oit_accum_texture(device: &wgpu::Device, size: UVec2) -> Texture {
+        Self::create_empty_texture(
+            device,
+            size,
+            wgpu::TextureFormat::Rgba16Float,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        )
+    }
+
+    fn create_oit_reveal_texture(device: &wgpu::Device, size: UVec2) -> Texture {
+        Self::create_empty_texture(
+            device,
+            size,
+            wgpu::TextureFormat::R8Unorm,
             wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         )
     }

@@ -12,3 +12,6 @@ pub use render_buffer::*;
 
 mod shader;
 pub(crate) use shader::*;
+
+mod texture;
+pub use texture::*;

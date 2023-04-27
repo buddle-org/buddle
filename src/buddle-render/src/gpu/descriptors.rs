@@ -1,6 +1,5 @@
 //! Describing what we want and have to the GPU
 
-
 use buddle_math::{Vec2, Vec3};
 
 #[repr(C)]
@@ -21,7 +20,7 @@ impl Vertex {
             position: position.into(),
             color: color.into(),
             normal: normal.into(),
-            tex_coords: tex_coords.into()
+            tex_coords: tex_coords.into(),
         }
     }
 
@@ -34,16 +33,24 @@ impl Vertex {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub enum MSAA {
     Off,
     On(u32),
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct DepthSettings {
+    pub compare: wgpu::CompareFunction,
+    pub write: bool
+}
+
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub struct SimplifiedPipelineConfig {
     pub wireframe: bool,
     pub msaa: MSAA,
+    pub targets: Vec<wgpu::ColorTargetState>,
+    pub depth_settings: Option<DepthSettings>,
 }
 
 /// See docs for [`wgpu::TextureViewDimension`]
@@ -57,6 +64,12 @@ pub enum TextureDimensions {
     D3,
 }
 
+pub enum BindGroupLayoutEntry {
+    Buffer,
+    Sampler{filtering: bool},
+    Texture{dim: TextureDimensions, filtering: bool},
+}
+
 impl Into<wgpu::TextureViewDimension> for &TextureDimensions {
     fn into(self) -> wgpu::TextureViewDimension {
         match self {
@@ -68,10 +81,4 @@ impl Into<wgpu::TextureViewDimension> for &TextureDimensions {
             TextureDimensions::D3 => wgpu::TextureViewDimension::D3,
         }
     }
-}
-
-pub enum BindGroupLayoutEntry {
-    Buffer,
-    Sampler,
-    Texture(TextureDimensions),
 }

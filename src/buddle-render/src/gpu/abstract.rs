@@ -1,8 +1,8 @@
 //! Type abstractions
 
-use buddle_math::{UVec2, Vec2, Vec3};
+use buddle_math::{Vec2, Vec3};
 
-use crate::{Context, TextureDimensions, Vertex};
+use crate::{Context, Texture, Vertex};
 
 pub struct Surface {
     pub(crate) surface: wgpu::Surface,
@@ -18,14 +18,6 @@ impl Surface {
 pub struct Shader {
     pub(crate) module: wgpu::ShaderModule,
     pub(crate) pipeline: wgpu::RenderPipeline,
-}
-
-pub struct Texture {
-    pub(crate) texture: wgpu::Texture,
-    pub(crate) view: wgpu::TextureView,
-    pub(crate) sampler: wgpu::Sampler,
-    pub(crate) dimensions: TextureDimensions,
-    pub(crate) size: UVec2,
 }
 
 pub struct RenderTexture {
@@ -70,6 +62,38 @@ impl Mesh {
             ),
         ];
         let indices = &[0, 1, 2, 0, 2, 3];
+
+        ctx.create_mesh(vertices, indices)
+    }
+
+    pub fn make_screen_plane(ctx: &Context) -> Self {
+        let vertices = &[
+            Vertex::new(
+                Vec3::new(1.0, 1.0, 0.0),
+                Vec3::new(1.0, 0.5, 1.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                Vec2::new(1.0, 0.0),
+            ),
+            Vertex::new(
+                Vec3::new(-1.0, 1.0, 0.0),
+                Vec3::new(0.0, 0.5, 1.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                Vec2::new(0.0, 0.0),
+            ),
+            Vertex::new(
+                Vec3::new(-1.0, -1.0, 0.0),
+                Vec3::new(0.0, 0.5, 0.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                Vec2::new(0.0, 1.0),
+            ),
+            Vertex::new(
+                Vec3::new(1.0, -1.0, 0.0),
+                Vec3::new(1.0, 0.5, 0.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                Vec2::new(1.0, 1.0),
+            ),
+        ];
+        let indices = &[2, 0, 3, 0, 2, 1];
 
         ctx.create_mesh(vertices, indices)
     }

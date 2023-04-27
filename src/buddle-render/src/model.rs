@@ -1,11 +1,9 @@
 //! Combines materials and meshes to easily render objects
 
-use bcndecode::{BcnDecoderFormat, BcnEncoding};
 
-use buddle_math::{Mat4, Quat, UVec2, Vec3};
+use buddle_math::{Mat4, Quat, Vec3};
 use buddle_nif::basic::Ref;
 use buddle_nif::compounds::Vector3;
-use buddle_nif::enums::PixelFormat;
 use buddle_nif::objects::{NiAVObject, NiObject};
 use buddle_nif::Nif;
 
@@ -14,7 +12,7 @@ use crate::{Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture, Transf
 pub struct Model {
     meshes: Vec<Mesh>,
     materials: Vec<Box<dyn Material>>,
-    owned_textures: Vec<Texture>,
+    _owned_textures: Vec<Texture>,
 }
 
 // Todo: Speedups
@@ -89,62 +87,12 @@ fn get_meshes_with_transforms(nif: &Nif) -> Vec<(&NiObject, Transform)> {
     res
 }
 
-impl Texture {
-    pub fn from_ni_texturing_property(
-        ctx: &Context,
-        property: &NiObject,
-        nif: &Nif,
-    ) -> Result<Self, ()> {
-        let NiObject::NiTexturingProperty(texturing) = property else {
-            return Err(());
-        };
-
-        let base_texture = texturing.base_texture.as_ref().ok_or(())?;
-
-        let NiObject::NiSourceTexture(source) = base_texture.source.get_or(&nif.blocks, ())? else {
-            return Err(());
-        };
-
-        let NiObject::NiPixelData(pixel_data) = source.pixel_data.get_or(&nif.blocks, ())? else {
-            return Err(());
-        };
-
-        let mm = pixel_data.mipmaps.get(0).ok_or(())?;
-        let size = UVec2::new(mm.width, mm.height);
-
-        if pixel_data.base.pixel_format == PixelFormat::PX_FMT_RGBA {
-            Ok(ctx.create_texture(&pixel_data.pixel_data, size))
-        } else if pixel_data.base.pixel_format == PixelFormat::PX_FMT_DXT1
-            || pixel_data.base.pixel_format == PixelFormat::PX_FMT_DXT3
-            || pixel_data.base.pixel_format == PixelFormat::PX_FMT_DXT5
-        {
-            let texture_data = bcndecode::decode(
-                &pixel_data.pixel_data,
-                mm.width as usize,
-                mm.height as usize,
-                match pixel_data.base.pixel_format {
-                    PixelFormat::PX_FMT_DXT1 => BcnEncoding::Bc1,
-                    PixelFormat::PX_FMT_DXT3 => BcnEncoding::Bc2,
-                    PixelFormat::PX_FMT_DXT5 => BcnEncoding::Bc3,
-                    _ => unreachable!(),
-                },
-                BcnDecoderFormat::RGBA,
-            )
-            .map_err(|_| ());
-
-            Ok(ctx.create_texture(&texture_data?, size))
-        } else {
-            Err(())
-        }
-    }
-}
-
 impl Model {
     pub fn from_mesh(mesh: Mesh, material: Box<dyn Material>) -> Self {
         Model {
             meshes: vec![mesh],
             materials: vec![material],
-            owned_textures: vec![],
+            _owned_textures: vec![],
         }
     }
 
@@ -238,19 +186,19 @@ impl Model {
                 }
             }
             let texture = texture?;
-            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, &texture));
+            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, &texture.0, texture.1, texture.2));
 
             let mesh = ctx.create_mesh(&vertices, &indices);
 
             meshes.push(mesh);
             materials.push(material);
-            textures.push(texture);
+            textures.push(texture.0);
         }
 
         Ok(Model {
             meshes,
             materials,
-            owned_textures: textures,
+            _owned_textures: textures,
         })
     }
 

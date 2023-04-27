@@ -12,6 +12,11 @@ struct VertexOutput {
     @location(2) normal: vec3<f32>,
 };
 
+struct FragmentOutput {
+    @location(0) accum: vec4<f32>,
+    @location(1) reveal: f32,
+}
+
 struct CameraData {
     view_matrix: mat4x4<f32>,
     proj_matrix: mat4x4<f32>,
@@ -46,12 +51,14 @@ var t_diffuse: texture_2d<f32>;
 var s_diffuse: sampler;
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var diff: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+fn fs_main(in: VertexOutput) -> FragmentOutput {
+    var color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
 
-    if diff.a < 1.0 {
-        discard;
-    }
+    var weight: f32 = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 *
+                         pow(1.0 - in.clip_position.z * 0.9, 3.0), 1e-2, 3e3);
 
-    return diff;
+    return FragmentOutput(
+        vec4<f32>(color.rgb * color.a, color.a) * weight,
+        color.a
+    );
 }

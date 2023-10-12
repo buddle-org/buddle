@@ -6,7 +6,7 @@ use winit::dpi::PhysicalPosition;
 
 use winit::event::{DeviceEvent, ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
+use winit::window::{CursorGrabMode, WindowBuilder};
 
 use crate::controller::CameraController;
 use buddle_math::{Mat4, UVec2, Vec2, Vec3};
@@ -22,8 +22,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_title("buddle")
         .build(&event_loop)
         .unwrap();
-
-    window.set_cursor_visible(false);
 
     let physical_size = window.inner_size();
     let mut ctx = Context::new(
@@ -44,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let root = Archive::heap("Root.wad", false).unwrap();
     let mut intern = Interner::new(&root);
 
-    let handle = intern.intern("Character/Owl/Owl_Gamma.nif").unwrap();
+    let handle = intern.intern("WC_Z01_Golem_Court.nif").unwrap();
     let data = intern.fetch_mut(handle).unwrap();
     let mut cursor = io::Cursor::new(data);
     let owl_gamma = Nif::parse(&mut cursor).unwrap();
@@ -53,6 +51,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut last_mouse_pos = Vec2::ZERO;
     let mut capture_mouse = true;
+
+    window.set_cursor_visible(false);
+    let _ = window.set_cursor_grab(CursorGrabMode::Confined);
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
@@ -99,6 +100,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                             Some(VirtualKeyCode::Escape) if pressed => {
                                 window.set_cursor_visible(capture_mouse);
                                 capture_mouse = !capture_mouse;
+
+                                if capture_mouse {
+                                    let _ = window.set_cursor_grab(CursorGrabMode::Confined);
+                                } else {
+                                    let _ = window.set_cursor_grab(CursorGrabMode::None);
+                                }
 
                                 let window_size = window.inner_size();
                                 let center = PhysicalPosition::new(

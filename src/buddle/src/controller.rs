@@ -48,6 +48,8 @@ impl CameraController {
             transform -= Vec3::Y
         }
 
+        transform *= 10.0;
+
         camera.position += transform;
         camera.target += transform;
 

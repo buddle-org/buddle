@@ -1,7 +1,6 @@
 //! Combines materials and meshes to easily render objects
 
-
-use buddle_math::{Mat4, Quat, Vec3};
+use buddle_math::{Mat4, Quat, Vec2, Vec3};
 use buddle_nif::basic::Ref;
 use buddle_nif::compounds::Vector3;
 use buddle_nif::objects::{NiAVObject, NiObject};
@@ -25,7 +24,7 @@ fn get_child_meshes_with_transforms(
 
     let Some(av) = object.avobject() else { return Vec::new() };
 
-    transform.translation += <Vector3 as Into<Vec3>>::into(av.translation.clone());
+    transform.translation += transform.rotation.mul_vec3(<Vector3 as Into<Vec3>>::into(av.translation.clone())) * transform.scale;
     transform.rotation *= Quat::from_mat3(&av.rotation.clone().into());
     transform.scale *= av.scale;
 
@@ -38,7 +37,7 @@ fn get_child_meshes_with_transforms(
             if let NiObject::NiMesh(mesh) = child_obj {
                 let mut mesh_transform = transform;
                 mesh_transform.translation +=
-                    <Vector3 as Into<Vec3>>::into(mesh.base.base.translation.clone());
+                    mesh_transform.rotation.mul_vec3(<Vector3 as Into<Vec3>>::into(mesh.base.base.translation.clone())) * mesh_transform.scale;
                 mesh_transform.rotation *= Quat::from_mat3(&mesh.base.base.rotation.clone().into());
                 mesh_transform.scale *= mesh.base.base.scale;
                 res.push((child_obj, mesh_transform));
@@ -58,9 +57,9 @@ fn get_child_meshes_with_transforms(
 fn get_meshes_with_transforms(nif: &Nif) -> Vec<(&NiObject, Transform)> {
     let mut res = Vec::new();
     for root in &nif.footer.roots {
-        let Some(object) = root.get(&nif.blocks) else { return Vec::new() };
+        let Some(object) = root.get(&nif.blocks) else { continue };
 
-        let Some(av) = object.avobject() else { return Vec::new() };
+        let Some(av) = object.avobject() else { continue };
 
         let transform = Transform::from_nif(
             av.translation.clone(),
@@ -68,7 +67,7 @@ fn get_meshes_with_transforms(nif: &Nif) -> Vec<(&NiObject, Transform)> {
             av.scale,
         );
 
-        let children = object.child_refs().unwrap();
+        let Some(children) = object.child_refs() else { continue };
 
         for child in children {
             if let Some(child_obj) = child.get(&nif.blocks) {
@@ -148,25 +147,62 @@ impl Model {
             let mut base_index = 0u16;
             let region_count = index_regions.len();
 
+            // This naively assumes that in any Nif there are either tex coords for all vertices or none
+            // If a vertex region other than the last misses tex coords, this assumption breaks and
+            // tex coords are used and generated for the wrong vertices
+            if vertex_regions.len() > tex_coords_regions.len() {
+                let start = tex_coords_regions.len();
+
+                for vertex_region in vertex_regions.iter().skip(start) {
+                    let mut tex_coords = Vec::new();
+
+                    for vertex in vertex_region {
+                        tex_coords.push(Vec2::new(vertex.x, vertex.y));
+                    }
+
+                    tex_coords_regions.push(tex_coords);
+                }
+            }
+
+            if vertex_regions.len() > normal_regions.len() {
+                let start = normal_regions.len();
+
+                for vertex_region in vertex_regions.iter().skip(start) {
+                    let mut normals = Vec::new();
+
+                    for _ in vertex_region {
+                        // How much harm could that possibly do, we're not even shading yet
+                        // Todo: actually calculate the normals
+                        normals.push(Vec3::new(0.0, 0.0, 0.0));
+                    }
+
+                    normal_regions.push(normals);
+                }
+            }
+
             for i in 0..region_count {
                 // Indices only reference vertices in their own region, so we have to offset them
                 for index in index_regions.get(i).ok_or(())? {
                     indices.push(base_index + index);
                 }
 
-                let count = vertex_regions.get(i).ok_or(())?.len();
+                let vertex_region = vertex_regions.get(i).ok_or(())?;
+                let count = vertex_region.len();
+
                 for j in 0..count {
                     // W101's up is Z so swap that
-                    let mut in_file_pos = *vertex_regions.get(i).ok_or(())?.get(j).ok_or(())?;
+                    let mut in_file_pos = *vertex_region.get(j).ok_or(())?;
                     in_file_pos = transform.rotation.mul_vec3(in_file_pos);
 
                     let mut pos = in_file_pos + transform.translation;
                     std::mem::swap(&mut pos.z, &mut pos.y);
+                    std::mem::swap(&mut pos.x, &mut pos.z);
+                    pos *= transform.scale;
 
                     let mut normal = normal_regions.get(i).ok_or(())?.get(j).ok_or(())?.clone();
                     std::mem::swap(&mut normal.z, &mut normal.y);
-                    normal.z *= -1.0;
-                    normal.x *= -1.0;
+                    std::mem::swap(&mut normal.x, &mut normal.z);
+
                     vertices.push(Vertex::new(
                         pos,
                         Vec3::ZERO,
@@ -185,8 +221,13 @@ impl Model {
                     break;
                 }
             }
-            let texture = texture?;
-            let material: Box<dyn Material> = Box::new(FlatMaterial::new(ctx, &texture.0, texture.1, texture.2));
+
+            // fixme: there exist models without textures that are duplicates of and at the same
+            //  position as other models. why?
+            let texture =
+                texture.unwrap_or_else(|_| (Texture::missing(ctx), false, true));
+            let material: Box<dyn Material> =
+                Box::new(FlatMaterial::new(ctx, &texture.0, texture.1, texture.2));
 
             let mesh = ctx.create_mesh(&vertices, &indices);
 

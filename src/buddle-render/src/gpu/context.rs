@@ -360,8 +360,11 @@ impl Context {
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
-                    front_face: wgpu::FrontFace::Cw,
-                    cull_mode: Some(wgpu::Face::Back),
+                    // fixme: figure out what the right config for this is
+                    //  gamebryo ships models with z-up, but we render with y-up
+                    //  maybe just render z-up...
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
                     polygon_mode: if config.wireframe {
                         wgpu::PolygonMode::Line
                     } else {
@@ -417,9 +420,9 @@ impl Context {
             ..Default::default()
         });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,

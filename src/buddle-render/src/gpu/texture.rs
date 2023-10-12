@@ -1,9 +1,9 @@
+use crate::{Context, TextureDimensions};
 use bcndecode::{BcnDecoderFormat, BcnEncoding};
 use buddle_math::UVec2;
 use buddle_nif::enums::PixelFormat;
-use buddle_nif::Nif;
 use buddle_nif::objects::NiObject;
-use crate::{Context, TextureDimensions};
+use buddle_nif::Nif;
 
 pub struct Texture {
     pub(crate) texture: wgpu::Texture,
@@ -14,13 +14,27 @@ pub struct Texture {
 }
 
 impl Texture {
+    pub fn missing(ctx: &Context) -> Self {
+        ctx.create_texture(
+            &[
+                0,0,0,255,
+                255,0,220,255,
+                255,0,220,255,
+                0,0,0,255,
+            ],
+            UVec2::new(2,2),
+        )
+    }
+
     pub fn from_ni_texturing_property(
         ctx: &Context,
         property: &NiObject,
         nif: &Nif,
     ) -> Result<(Self, bool, bool), ()> {
-        let NiObject::NiTexturingProperty(texturing) = property else {
-            return Err(());
+        let texturing = match property {
+            NiObject::NiTexturingProperty(prop) => prop,
+            NiObject::NiMultiTextureProperty(multi_prop) => &multi_prop.base,
+            _ => return Err(()),
         };
 
         let base_texture = texturing.base_texture.as_ref().ok_or(())?;
@@ -54,7 +68,7 @@ impl Texture {
                 },
                 BcnDecoderFormat::RGBA,
             )
-                .map_err(|_| ())?;
+            .map_err(|_| ())?;
         } else {
             return Err(());
         }

@@ -25,7 +25,7 @@ pub struct Camera {
 }
 
 pub struct Rasterizer {
-    camera: Camera,
+    pub camera: Camera,
     camera_buffer: Buffer,
     camera_bind_group: BindGroup,
 }
@@ -85,7 +85,6 @@ impl Rasterizer {
             Mat4::look_at_rh(self.camera.position, self.camera.target, self.camera.up);
         let proj_matrix;
         if self.camera.cam_type == CameraType::Perspective {
-
             proj_matrix = Mat4::perspective_rh_gl(
                 self.camera.fov.to_radians(),
                 aspect,
@@ -138,11 +137,7 @@ pub(crate) struct CameraData {
 }
 
 impl CameraData {
-    pub fn new(
-        view_matrix: Mat4,
-        proj_matrix: Mat4,
-        position: Vec3,
-    ) -> Self {
+    pub fn new(view_matrix: Mat4, proj_matrix: Mat4, position: Vec3) -> Self {
         Self {
             view_matrix: view_matrix.to_cols_array_2d(),
             proj_matrix: proj_matrix.to_cols_array_2d(),
@@ -160,20 +155,13 @@ pub(crate) struct ModelMatrices {
 }
 
 impl ModelMatrices {
-    pub fn new(
-        view_matrix: Mat4,
-        proj_matrix: Mat4,
-        model_matrix: Mat4,
-    ) -> Self {
+    pub fn new(view_matrix: Mat4, proj_matrix: Mat4, model_matrix: Mat4) -> Self {
         let model_view_matrix = view_matrix * model_matrix;
 
         Self {
             mvp: ((proj_matrix * view_matrix) * model_matrix).to_cols_array_2d(),
             model_matrix: model_matrix.to_cols_array_2d(),
-            normal_matrix: model_view_matrix
-                .inverse()
-                .transpose()
-                .to_cols_array_2d(),
+            normal_matrix: model_view_matrix.inverse().transpose().to_cols_array_2d(),
         }
     }
 }

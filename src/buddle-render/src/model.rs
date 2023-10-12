@@ -24,7 +24,10 @@ fn get_child_meshes_with_transforms(
 
     let Some(av) = object.avobject() else { return Vec::new() };
 
-    transform.translation += transform.rotation.mul_vec3(<Vector3 as Into<Vec3>>::into(av.translation.clone())) * transform.scale;
+    transform.translation += transform
+        .rotation
+        .mul_vec3(<Vector3 as Into<Vec3>>::into(av.translation.clone()))
+        * transform.scale;
     transform.rotation *= Quat::from_mat3(&av.rotation.clone().into());
     transform.scale *= av.scale;
 
@@ -36,8 +39,11 @@ fn get_child_meshes_with_transforms(
         if let Some(child_obj) = child.get(&nif.blocks) {
             if let NiObject::NiMesh(mesh) = child_obj {
                 let mut mesh_transform = transform;
-                mesh_transform.translation +=
-                    mesh_transform.rotation.mul_vec3(<Vector3 as Into<Vec3>>::into(mesh.base.base.translation.clone())) * mesh_transform.scale;
+                mesh_transform.translation += mesh_transform.rotation.mul_vec3(<Vector3 as Into<
+                    Vec3,
+                >>::into(
+                    mesh.base.base.translation.clone(),
+                )) * mesh_transform.scale;
                 mesh_transform.rotation *= Quat::from_mat3(&mesh.base.base.rotation.clone().into());
                 mesh_transform.scale *= mesh.base.base.scale;
                 res.push((child_obj, mesh_transform));
@@ -206,7 +212,7 @@ impl Model {
                     vertices.push(Vertex::new(
                         pos,
                         Vec3::ZERO,
-                        normal,
+                        *normal_regions.get(i).ok_or(())?.get(j).ok_or(())?,
                         *tex_coords_regions.get(i).ok_or(())?.get(j).ok_or(())?,
                     ))
                 }
@@ -224,8 +230,7 @@ impl Model {
 
             // fixme: there exist models without textures that are duplicates of and at the same
             //  position as other models. why?
-            let texture =
-                texture.unwrap_or_else(|_| (Texture::missing(ctx), false, true));
+            let texture = texture.unwrap_or_else(|_| (Texture::missing(ctx), false, true));
             let material: Box<dyn Material> =
                 Box::new(FlatMaterial::new(ctx, &texture.0, texture.1, texture.2));
 

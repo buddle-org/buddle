@@ -362,7 +362,6 @@ impl Context {
                     strip_index_format: None,
                     // fixme: figure out what the right config for this is
                     //  gamebryo ships models with z-up, but we render with y-up
-                    //  maybe just render z-up...
                     front_face: wgpu::FrontFace::Ccw,
                     cull_mode: None,
                     polygon_mode: if config.wireframe {

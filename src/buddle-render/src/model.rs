@@ -4,7 +4,10 @@ use buddle_math::{Mat4, Vec2, Vec3};
 use buddle_nif::objects::NiObject;
 use buddle_nif::Nif;
 
-use crate::{Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture, Transform, Vertex};
+use crate::{
+    blend_state_from_alpha_property, Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture,
+    Transform, Vertex,
+};
 
 pub struct Model {
     meshes: Vec<Mesh>,
@@ -80,6 +83,10 @@ impl Model {
                 NiObject::NiMesh(mesh) => mesh,
                 _ => unreachable!(),
             };
+
+            let name = nif.header.strings[ni_mesh.base.base.base.name.index.0 as usize]
+                .data
+                .clone();
 
             let mut index_regions = Vec::new();
             let mut vertex_regions = Vec::new();
@@ -185,19 +192,30 @@ impl Model {
             }
 
             let mut texture = Err(());
+            let mut alpha = None;
 
             for property in properties {
-                texture = Texture::from_ni_texturing_property(ctx, property, &nif);
-                if texture.is_ok() {
-                    break;
+                if let NiObject::NiAlphaProperty(alpha_prop) = property {
+                    alpha = Some(alpha_prop);
+                }
+
+                if texture.is_err() {
+                    texture = Texture::from_ni_texturing_property(ctx, property, &nif);
                 }
             }
+
+            let blend = if let Some(alpha) = alpha {
+                blend_state_from_alpha_property(alpha)
+            } else {
+                None
+            };
 
             // fixme: there exist models without textures that are duplicates of and at the same
             //  position as other models. why?
             let texture = texture.unwrap_or_else(|_| (Texture::missing(ctx), false, true));
-            let material: Box<dyn Material> =
-                Box::new(FlatMaterial::new(ctx, &texture.0, texture.1, texture.2));
+            let material: Box<dyn Material> = Box::new(FlatMaterial::new(
+                ctx, &texture.0, blend, texture.1, texture.2,
+            ));
 
             let mesh = ctx.create_mesh(&vertices, &indices);
 

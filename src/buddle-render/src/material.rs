@@ -1,3 +1,5 @@
+use buddle_nif::enums::AlphaFunction;
+use buddle_nif::objects::NiAlphaProperty;
 use std::rc::Rc;
 
 use crate::gpu::{FLAT_TEXTURE, OIT_FLAT_TEXTURE};
@@ -22,17 +24,67 @@ pub struct FlatMaterial {
     bind_group: wgpu::BindGroup,
 }
 
+pub fn blend_state_from_alpha_property(alpha: &NiAlphaProperty) -> Option<wgpu::BlendState> {
+    if !alpha.flags.alpha_blend() {
+        return None;
+    }
+
+    let src = alpha.flags.source_blend_mode();
+    let dst = alpha.flags.destination_blend_mode();
+
+    let mut res = wgpu::BlendState::REPLACE;
+
+    res.color.src_factor = match src {
+        AlphaFunction::ALPHA_ONE => wgpu::BlendFactor::One,
+        AlphaFunction::ALPHA_ZERO => wgpu::BlendFactor::Zero,
+        AlphaFunction::ALPHA_SRC_COLOR => wgpu::BlendFactor::Src,
+        AlphaFunction::ALPHA_INV_SRC_COLOR => wgpu::BlendFactor::OneMinusSrc,
+        AlphaFunction::ALPHA_DEST_COLOR => wgpu::BlendFactor::Dst,
+        AlphaFunction::ALPHA_INV_DEST_COLOR => wgpu::BlendFactor::OneMinusDst,
+        AlphaFunction::ALPHA_SRC_ALPHA => wgpu::BlendFactor::SrcAlpha,
+        AlphaFunction::ALPHA_INV_SRC_ALPHA => wgpu::BlendFactor::OneMinusSrcAlpha,
+        AlphaFunction::ALPHA_DEST_ALPHA => wgpu::BlendFactor::DstAlpha,
+        AlphaFunction::ALPHA_INV_DEST_ALPHA => wgpu::BlendFactor::OneMinusDstAlpha,
+        AlphaFunction::ALPHA_SRC_ALPHA_SATURATE => wgpu::BlendFactor::SrcAlphaSaturated,
+    };
+
+    res.color.dst_factor = match dst {
+        AlphaFunction::ALPHA_ONE => wgpu::BlendFactor::One,
+        AlphaFunction::ALPHA_ZERO => wgpu::BlendFactor::Zero,
+        AlphaFunction::ALPHA_SRC_COLOR => wgpu::BlendFactor::Src,
+        AlphaFunction::ALPHA_INV_SRC_COLOR => wgpu::BlendFactor::OneMinusSrc,
+        AlphaFunction::ALPHA_DEST_COLOR => wgpu::BlendFactor::Dst,
+        AlphaFunction::ALPHA_INV_DEST_COLOR => wgpu::BlendFactor::OneMinusDst,
+        AlphaFunction::ALPHA_SRC_ALPHA => wgpu::BlendFactor::SrcAlpha,
+        AlphaFunction::ALPHA_INV_SRC_ALPHA => wgpu::BlendFactor::OneMinusSrcAlpha,
+        AlphaFunction::ALPHA_DEST_ALPHA => wgpu::BlendFactor::DstAlpha,
+        AlphaFunction::ALPHA_INV_DEST_ALPHA => wgpu::BlendFactor::OneMinusDstAlpha,
+        AlphaFunction::ALPHA_SRC_ALPHA_SATURATE => wgpu::BlendFactor::SrcAlphaSaturated,
+    };
+
+    Some(res)
+}
+
 impl FlatMaterial {
-    pub fn new(ctx: &Context, diffuse: &Texture, transparent: bool, opaque: bool) -> Self {
+    pub fn new(
+        ctx: &Context,
+        diffuse: &Texture,
+        blend: Option<wgpu::BlendState>,
+        mut transparent: bool,
+        mut opaque: bool,
+    ) -> Self {
         let config = SimplifiedPipelineConfig {
             wireframe: false,
             msaa: MSAA::Off,
             targets: vec![wgpu::ColorTargetState {
                 format: ctx.surface.config.format,
-                blend: None,
+                blend,
                 write_mask: wgpu::ColorWrites::ALL,
             }],
-            depth_settings: Some(DepthSettings{compare: wgpu::CompareFunction::Less, write: true}),
+            depth_settings: Some(DepthSettings {
+                compare: wgpu::CompareFunction::Less,
+                write: true,
+            }),
         };
 
         let transparent_config = SimplifiedPipelineConfig {
@@ -107,7 +159,7 @@ impl FlatMaterial {
             shader,
             transparent_shader,
             bind_group,
-            transparent,
+            transparent: transparent || blend.is_some(),
             opaque,
         }
     }

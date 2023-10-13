@@ -1,5 +1,4 @@
 use buddle_math::{Mat3, Vec2, Vec3};
-use buddle_nif::compounds::{Matrix33, Quaternion};
 use buddle_render::Camera;
 
 pub struct CameraController {

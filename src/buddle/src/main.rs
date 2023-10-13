@@ -49,7 +49,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let gamma = Model::from_nif(&ctx, owl_gamma).unwrap();
 
-    let mut last_mouse_pos = Vec2::ZERO;
     let mut capture_mouse = true;
 
     window.set_cursor_visible(false);
@@ -72,50 +71,46 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 _ => {}
             },
-            Event::DeviceEvent { event, .. } => {
-                match event {
-                    DeviceEvent::MouseMotion { delta } if capture_mouse => {
-                        controller.add_mouse_delta(Vec2::new(delta.0 as f32, delta.1 as f32));
+            Event::DeviceEvent { event, .. } => match event {
+                DeviceEvent::MouseMotion { delta } if capture_mouse => {
+                    controller.add_mouse_delta(Vec2::new(delta.0 as f32, delta.1 as f32));
 
-                        let window_size = window.inner_size();
-                        let center =
-                            PhysicalPosition::new(window_size.width / 2, window_size.height / 2);
-                        window.set_cursor_position(center).unwrap();
-                    }
-                    DeviceEvent::Key(input) => {
-                        let pressed = input.state == ElementState::Pressed;
-                        match input.virtual_keycode {
-                            Some(VirtualKeyCode::W) => controller.set_key_state(0, pressed),
-                            Some(VirtualKeyCode::S) => controller.set_key_state(1, pressed),
-                            Some(VirtualKeyCode::A) => controller.set_key_state(2, pressed),
-                            Some(VirtualKeyCode::D) => controller.set_key_state(3, pressed),
-                            Some(VirtualKeyCode::Space) => controller.set_key_state(4, pressed),
-                            Some(VirtualKeyCode::LShift) => controller.set_key_state(5, pressed),
-                            Some(VirtualKeyCode::Escape) if pressed => {
-                                window.set_cursor_visible(capture_mouse);
-                                capture_mouse = !capture_mouse;
-
-                                if capture_mouse {
-                                    let _ = window.set_cursor_grab(CursorGrabMode::Confined);
-                                } else {
-                                    let _ = window.set_cursor_grab(CursorGrabMode::None);
-                                }
-
-                                let window_size = window.inner_size();
-                                let center = PhysicalPosition::new(
-                                    window_size.width / 2,
-                                    window_size.height / 2,
-                                );
-                                window.set_cursor_position(center).unwrap();
-
-                                last_mouse_pos = Vec2::new(center.x as f32, center.y as f32);
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
+                    let window_size = window.inner_size();
+                    let center =
+                        PhysicalPosition::new(window_size.width / 2, window_size.height / 2);
+                    window.set_cursor_position(center).unwrap();
                 }
-            }
+                DeviceEvent::Key(input) => {
+                    let pressed = input.state == ElementState::Pressed;
+                    match input.virtual_keycode {
+                        Some(VirtualKeyCode::W) => controller.set_key_state(0, pressed),
+                        Some(VirtualKeyCode::S) => controller.set_key_state(1, pressed),
+                        Some(VirtualKeyCode::A) => controller.set_key_state(2, pressed),
+                        Some(VirtualKeyCode::D) => controller.set_key_state(3, pressed),
+                        Some(VirtualKeyCode::Space) => controller.set_key_state(4, pressed),
+                        Some(VirtualKeyCode::LShift) => controller.set_key_state(5, pressed),
+                        Some(VirtualKeyCode::Escape) if pressed => {
+                            window.set_cursor_visible(capture_mouse);
+                            capture_mouse = !capture_mouse;
+
+                            if capture_mouse {
+                                let _ = window.set_cursor_grab(CursorGrabMode::Confined);
+                            } else {
+                                let _ = window.set_cursor_grab(CursorGrabMode::None);
+                            }
+
+                            let window_size = window.inner_size();
+                            let center = PhysicalPosition::new(
+                                window_size.width / 2,
+                                window_size.height / 2,
+                            );
+                            window.set_cursor_position(center).unwrap();
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            },
             Event::MainEventsCleared => {
                 controller.update_free(&mut rast.camera);
 

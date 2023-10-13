@@ -1,9 +1,7 @@
 //! Combines materials and meshes to easily render objects
 
-use buddle_math::{Mat4, Quat, Vec2, Vec3};
-use buddle_nif::basic::Ref;
-use buddle_nif::compounds::Vector3;
-use buddle_nif::objects::{NiAVObject, NiObject};
+use buddle_math::{Mat4, Vec2, Vec3};
+use buddle_nif::objects::NiObject;
 use buddle_nif::Nif;
 
 use crate::{Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture, Transform, Vertex};
@@ -15,21 +13,14 @@ pub struct Model {
 }
 
 // Todo: Speedups
-fn get_child_meshes_with_transforms(
-    nif: &Nif,
-    obj: Ref<NiAVObject>,
+fn get_child_meshes_with_transforms<'a>(
+    nif: &'a Nif,
+    object: &'a NiObject,
     mut transform: Transform,
-) -> Vec<(&NiObject, Transform)> {
-    let Some(object) = obj.get(&nif.blocks) else { return Vec::new() };
-
+) -> Vec<(&'a NiObject, Transform)> {
     let Some(av) = object.avobject() else { return Vec::new() };
 
-    transform.translation += transform
-        .rotation
-        .mul_vec3(<Vector3 as Into<Vec3>>::into(av.translation.clone()))
-        * transform.scale;
-    transform.rotation *= Quat::from_mat3(&av.rotation.clone().into());
-    transform.scale *= av.scale;
+    transform = transform * Transform::from_nif(av);
 
     let Some(children) = object.child_refs() else { return Vec::new() };
 
@@ -38,19 +29,11 @@ fn get_child_meshes_with_transforms(
     for child in children {
         if let Some(child_obj) = child.get(&nif.blocks) {
             if let NiObject::NiMesh(mesh) = child_obj {
-                let mut mesh_transform = transform;
-                mesh_transform.translation += mesh_transform.rotation.mul_vec3(<Vector3 as Into<
-                    Vec3,
-                >>::into(
-                    mesh.base.base.translation.clone(),
-                )) * mesh_transform.scale;
-                mesh_transform.rotation *= Quat::from_mat3(&mesh.base.base.rotation.clone().into());
-                mesh_transform.scale *= mesh.base.base.scale;
-                res.push((child_obj, mesh_transform));
+                res.push((child_obj, transform * Transform::from_nif(&mesh.base.base)));
             } else {
                 res.append(&mut get_child_meshes_with_transforms(
                     nif,
-                    child.clone(),
+                    child.get(&nif.blocks).unwrap(),
                     transform,
                 ))
             }
@@ -65,29 +48,11 @@ fn get_meshes_with_transforms(nif: &Nif) -> Vec<(&NiObject, Transform)> {
     for root in &nif.footer.roots {
         let Some(object) = root.get(&nif.blocks) else { continue };
 
-        let Some(av) = object.avobject() else { continue };
-
-        let transform = Transform::from_nif(
-            av.translation.clone(),
-            Quat::from_mat3(&av.rotation.clone().into()),
-            av.scale,
-        );
-
-        let Some(children) = object.child_refs() else { continue };
-
-        for child in children {
-            if let Some(child_obj) = child.get(&nif.blocks) {
-                if let NiObject::NiMesh(_) = child_obj {
-                    res.push((child_obj, transform));
-                } else {
-                    res.append(&mut get_child_meshes_with_transforms(
-                        nif,
-                        child.clone(),
-                        transform,
-                    ))
-                }
-            }
-        }
+        res.append(&mut get_child_meshes_with_transforms(
+            nif,
+            object,
+            Transform::default(),
+        ))
     }
     res
 }
@@ -196,14 +161,14 @@ impl Model {
                 let count = vertex_region.len();
 
                 for j in 0..count {
-                    // W101's up is Z so swap that
                     let mut in_file_pos = *vertex_region.get(j).ok_or(())?;
                     in_file_pos = transform.rotation.mul_vec3(in_file_pos);
 
+                    // W101's up is Z so swap that
                     let mut pos = in_file_pos + transform.translation;
                     std::mem::swap(&mut pos.z, &mut pos.y);
                     std::mem::swap(&mut pos.x, &mut pos.z);
-                    pos *= transform.scale;
+                    pos *= transform.scale * 0.01;
 
                     let mut normal = normal_regions.get(i).ok_or(())?.get(j).ok_or(())?.clone();
                     std::mem::swap(&mut normal.z, &mut normal.y);

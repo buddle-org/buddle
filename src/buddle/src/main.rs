@@ -70,24 +70,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     ctx.resize(UVec2::new(new_inner_size.width, new_inner_size.height));
                 }
-                WindowEvent::CursorMoved { position, .. } if capture_mouse => {
-                    let pos = Vec2::new(position.x as f32, position.y as f32);
-                    controller.add_mouse_delta(pos - last_mouse_pos);
-
-                    let window_size = window.inner_size();
-                    let center =
-                        PhysicalPosition::new(window_size.width / 2, window_size.height / 2);
-                    window.set_cursor_position(center).unwrap();
-
-                    last_mouse_pos = Vec2::new(center.x as f32, center.y as f32);
-                }
                 _ => {}
             },
             Event::DeviceEvent { event, .. } => {
                 match event {
-                    //DeviceEvent::MouseMotion { delta} => {
-                    //    controller.add_mouse_delta(Vec2::new(delta.0 as f32, delta.1 as f32));
-                    //}
+                    DeviceEvent::MouseMotion { delta } if capture_mouse => {
+                        controller.add_mouse_delta(Vec2::new(delta.0 as f32, delta.1 as f32));
+
+                        let window_size = window.inner_size();
+                        let center =
+                            PhysicalPosition::new(window_size.width / 2, window_size.height / 2);
+                        window.set_cursor_position(center).unwrap();
+                    }
                     DeviceEvent::Key(input) => {
                         let pressed = input.state == ElementState::Pressed;
                         match input.virtual_keycode {

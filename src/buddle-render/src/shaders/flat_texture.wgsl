@@ -7,9 +7,10 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_coords: vec2<f32>,
-    @location(1) position: vec3<f32>,
-    @location(2) normal: vec3<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) tex_coords: vec2<f32>,
+    @location(2) position: vec3<f32>,
+    @location(3) normal: vec3<f32>,
 };
 
 struct CameraData {
@@ -34,6 +35,7 @@ var<uniform> model: ModelMatrices;
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = model.mvp * vec4<f32>(in.position, 1.0);
+    out.color = in.color;
     out.tex_coords = in.tex_coords;
     out.position = (model.model_matrix * vec4<f32>(in.position, 1.0)).xyz;
     out.normal = in.normal;
@@ -47,7 +49,7 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var diff: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    var diff: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords) * vec4<f32>(in.color, 1.0);
 
     if diff.a < 1.0 {
         discard;

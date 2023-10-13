@@ -7,9 +7,10 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_coords: vec2<f32>,
-    @location(1) position: vec3<f32>,
-    @location(2) normal: vec3<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) tex_coords: vec2<f32>,
+    @location(2) position: vec3<f32>,
+    @location(3) normal: vec3<f32>
 };
 
 struct FragmentOutput {
@@ -39,6 +40,7 @@ var<uniform> model: ModelMatrices;
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = model.mvp * vec4<f32>(in.position, 1.0);
+    out.color = in.color;
     out.tex_coords = in.tex_coords;
     out.position = (model.model_matrix * vec4<f32>(in.position, 1.0)).xyz;
     out.normal = in.normal;
@@ -52,7 +54,7 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
-    var color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    var color: vec4<f32> = textureSample(t_diffuse, s_diffuse, in.tex_coords) * vec4<f32>(in.color, 1.0);
 
     var weight: f32 = clamp(pow(min(1.0, color.a * 10.0) + 0.01, 3.0) * 1e8 *
                          pow(1.0 - in.clip_position.z * 0.9, 3.0), 1e-2, 3e3);

@@ -159,7 +159,7 @@ impl FlatMaterial {
             shader,
             transparent_shader,
             bind_group,
-            transparent: transparent || blend.is_some(),
+            transparent,
             opaque,
         }
     }

@@ -1,4 +1,4 @@
-use buddle_math::{Vec2, Vec3};
+use buddle_math::{BVec4, Vec2, Vec3, Vec4};
 
 use super::*;
 
@@ -205,6 +205,21 @@ impl NiDataStream {
             let y = *floats.take_first().unwrap();
             let z = *floats.take_first().unwrap();
             Vec3::new(x, y, z)
+        })
+    }
+
+    pub fn read_color4(&self) -> Vec<Vec<Vec4>> {
+        self.read_with(|bytes| {
+            let b: u8 = *bytes.take_first().unwrap();
+            let g: u8 = *bytes.take_first().unwrap();
+            let r: u8 = *bytes.take_first().unwrap();
+            let a: u8 = *bytes.take_first().unwrap();
+            Vec4::new(
+                r as f32 / 255.0,
+                g as f32 / 255.0,
+                b as f32 / 255.0,
+                a as f32 / 255.0,
+            )
         })
     }
 }

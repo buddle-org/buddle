@@ -1,6 +1,6 @@
 //! Combines materials and meshes to easily render objects
 
-use buddle_math::{Mat4, Vec2, Vec3};
+use buddle_math::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use buddle_nif::objects::NiObject;
 use buddle_nif::Nif;
 
@@ -92,6 +92,7 @@ impl Model {
             let mut vertex_regions = Vec::new();
             let mut tex_coords_regions = Vec::new();
             let mut normal_regions = Vec::new();
+            let mut color_regions = Vec::new();
 
             for ds_ref in &ni_mesh.datastreams {
                 let datastream = {
@@ -116,6 +117,8 @@ impl Model {
                     vertex_regions = datastream.read_vec3();
                 } else if kind.data.starts_with("NORMAL") {
                     normal_regions = datastream.read_vec3();
+                } else if kind.data.starts_with("COLOR") {
+                    color_regions = datastream.read_color4();
                 }
             }
 
@@ -158,6 +161,20 @@ impl Model {
                 }
             }
 
+            if vertex_regions.len() > color_regions.len() {
+                let start = color_regions.len();
+
+                for vertex_region in vertex_regions.iter().skip(start) {
+                    let mut colors = Vec::new();
+
+                    for _ in vertex_region {
+                        colors.push(Vec4::new(1.0, 1.0, 1.0, 1.0));
+                    }
+
+                    color_regions.push(colors);
+                }
+            }
+
             for i in 0..region_count {
                 // Indices only reference vertices in their own region, so we have to offset them
                 for index in index_regions.get(i).ok_or(())? {
@@ -183,7 +200,7 @@ impl Model {
 
                     vertices.push(Vertex::new(
                         pos,
-                        Vec3::ZERO,
+                        color_regions.get(i).ok_or(())?.get(j).ok_or(())?.xyz(),
                         *normal_regions.get(i).ok_or(())?.get(j).ok_or(())?,
                         *tex_coords_regions.get(i).ok_or(())?.get(j).ok_or(())?,
                     ))

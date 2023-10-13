@@ -128,7 +128,7 @@ impl Model {
                     let mut tex_coords = Vec::new();
 
                     for vertex in vertex_region {
-                        tex_coords.push(Vec2::new(vertex.x, vertex.y));
+                        tex_coords.push(Vec2::new(vertex.x, vertex.y) * 0.01);
                     }
 
                     tex_coords_regions.push(tex_coords);
@@ -165,10 +165,10 @@ impl Model {
                     in_file_pos = transform.rotation.mul_vec3(in_file_pos);
 
                     // W101's up is Z so swap that
-                    let mut pos = in_file_pos + transform.translation;
+                    let mut pos = in_file_pos * transform.scale + transform.translation;
                     std::mem::swap(&mut pos.z, &mut pos.y);
                     std::mem::swap(&mut pos.x, &mut pos.z);
-                    pos *= transform.scale * 0.01;
+                    pos *= 0.01;
 
                     let mut normal = normal_regions.get(i).ok_or(())?.get(j).ok_or(())?.clone();
                     std::mem::swap(&mut normal.z, &mut normal.y);

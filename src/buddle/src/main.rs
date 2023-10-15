@@ -45,9 +45,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let handle = intern.intern("WC_Z01_Golem_Court.nif").unwrap();
     let data = intern.fetch_mut(handle).unwrap();
     let mut cursor = io::Cursor::new(data);
-    let owl_gamma = Nif::parse(&mut cursor).unwrap();
+    let nif = Nif::parse(&mut cursor).unwrap();
 
-    let gamma = Model::from_nif(&ctx, owl_gamma).unwrap();
+    let model = Model::from_nif(&ctx, &mut intern, nif).unwrap();
 
     let mut capture_mouse = true;
 
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 let mut rb = rast.new_frame(&ctx);
 
-                gamma.render_to(&mut rb, Mat4::IDENTITY);
+                model.render_to(&mut rb, Mat4::IDENTITY);
 
                 rb.submit(&ctx).unwrap();
             }

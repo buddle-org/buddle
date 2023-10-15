@@ -394,6 +394,7 @@ dependencies = [
  "bcndecode",
  "buddle-math",
  "buddle-nif",
+ "buddle-wad",
  "bytemuck",
  "log",
  "pollster",

@@ -3,6 +3,7 @@
 use buddle_math::{Mat4, Vec2, Vec3, Vec4, Vec4Swizzles};
 use buddle_nif::objects::NiObject;
 use buddle_nif::Nif;
+use buddle_wad::{Archive, Interner};
 
 use crate::{
     blend_state_from_alpha_property, Context, FlatMaterial, Material, Mesh, RenderBuffer, Texture,
@@ -48,12 +49,10 @@ fn get_child_meshes_with_transforms<'a>(
 
 fn get_meshes_with_transforms(nif: &Nif) -> Vec<(&NiObject, Transform)> {
     let mut res = Vec::new();
-    for root in &nif.footer.roots {
-        let Some(object) = root.get(&nif.blocks) else { continue };
-
+    for root in &nif.root_objects() {
         res.append(&mut get_child_meshes_with_transforms(
             nif,
-            object,
+            root,
             Transform::default(),
         ))
     }
@@ -69,7 +68,7 @@ impl Model {
         }
     }
 
-    pub fn from_nif(ctx: &Context, nif: Nif) -> Result<Self, ()> {
+    pub fn from_nif(ctx: &Context, intern: &mut Interner<&Archive>, nif: Nif) -> Result<Self, ()> {
         let mut meshes = Vec::new();
         let mut materials = Vec::new();
         let mut textures = Vec::new();
@@ -83,10 +82,6 @@ impl Model {
                 NiObject::NiMesh(mesh) => mesh,
                 _ => unreachable!(),
             };
-
-            let name = nif.header.strings[ni_mesh.base.base.base.name.index.0 as usize]
-                .data
-                .clone();
 
             let mut index_regions = Vec::new();
             let mut vertex_regions = Vec::new();
@@ -217,7 +212,7 @@ impl Model {
                 }
 
                 if texture.is_err() {
-                    texture = Texture::from_ni_texturing_property(ctx, property, &nif);
+                    texture = Texture::from_ni_texturing_property(ctx, property, intern, &nif);
                 }
             }
 

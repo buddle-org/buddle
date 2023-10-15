@@ -11,6 +11,7 @@ edition = "2021"
 [dependencies]
 buddle-math = { path = "../buddle-math" }
 buddle-nif = { path = "../buddle-nif" }
+buddle-wad = { path = "../buddle-wad" }
 
 bcndecode = "0.2.0"
 bytemuck = { version = "1.8", features = ["derive"] }

@@ -1,4 +1,7 @@
+#![feature(iter_advance_by)]
+
 mod controller;
+mod loader;
 
 use std::error::Error;
 use std::io;
@@ -9,11 +12,11 @@ use winit::event_loop::EventLoop;
 use winit::window::{CursorGrabMode, WindowBuilder};
 
 use crate::controller::CameraController;
+use crate::loader::ToModel;
 use buddle_math::{Mat4, UVec2, Vec2, Vec3};
 use buddle_nif::Nif;
+use buddle_render::Camera;
 use buddle_render::Context;
-use buddle_render::Model;
-use buddle_render::{Camera, Material};
 use buddle_wad::{Archive, Interner};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -47,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut cursor = io::Cursor::new(data);
     let nif = Nif::parse(&mut cursor).unwrap();
 
-    let model = Model::from_nif(&ctx, &mut intern, nif).unwrap();
+    let model = (nif, &mut intern).to_model(&ctx).unwrap();
 
     let mut capture_mouse = true;
 

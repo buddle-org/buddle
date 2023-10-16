@@ -133,9 +133,9 @@ impl Context {
     /// Creates a new [Mesh]
     ///
     /// Creates two [Buffer]s internally
-    pub fn create_mesh(&self, vertices: &[Vertex], indices: &[u16]) -> Mesh {
-        let vertex_buffer = self.create_buffer(vertices, wgpu::BufferUsages::VERTEX);
-        let index_buffer = self.create_buffer(indices, wgpu::BufferUsages::INDEX);
+    pub fn create_mesh(&self, vertices: Vec<Vertex>, indices: Vec<u16>) -> Mesh {
+        let vertex_buffer = self.create_buffer(&vertices, wgpu::BufferUsages::VERTEX);
+        let index_buffer = self.create_buffer(&indices, wgpu::BufferUsages::INDEX);
         let model_buffer = self.create_buffer(
             &[ModelMatrices::new(
                 Mat4::IDENTITY,
@@ -151,6 +151,8 @@ impl Context {
 
         Mesh {
             num_triangles: indices.len() as u32,
+            vertices,
+            indices,
             vertex_buffer,
             index_buffer,
             model_buffer,
@@ -311,7 +313,7 @@ impl Context {
         }
 
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: layout,
+            layout,
             entries: entries.as_slice(),
             label: Some("Bind Group"),
         })

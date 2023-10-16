@@ -14,4 +14,6 @@ buddle-render = { path = "../buddle-render" }
 buddle-object-property = { path = "../buddle-object-property" }
 buddle-wad = { path = "../buddle-wad" }
 
+bcndecode = "0.2.0"
+wgpu = "0.15"
 winit = "0.28"

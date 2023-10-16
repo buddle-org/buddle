@@ -279,12 +279,14 @@ dependencies = [
 name = "buddle"
 version = "0.1.0"
 dependencies = [
+ "bcndecode",
  "buddle-math",
  "buddle-net",
  "buddle-nif",
  "buddle-object-property",
  "buddle-render",
  "buddle-wad",
+ "wgpu",
  "winit",
 ]
 
@@ -391,7 +393,6 @@ dependencies = [
 name = "buddle-render"
 version = "0.1.0"
 dependencies = [
- "bcndecode",
  "buddle-math",
  "buddle-nif",
  "buddle-wad",

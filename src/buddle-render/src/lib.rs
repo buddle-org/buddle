@@ -1,5 +1,3 @@
-#![feature(iter_advance_by)]
-
 mod camera;
 pub use camera::*;
 

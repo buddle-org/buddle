@@ -27,6 +27,8 @@ pub struct RenderTexture {
 
 pub struct Mesh {
     pub num_triangles: u32,
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u16>,
     pub(crate) vertex_buffer: wgpu::Buffer,
     pub(crate) index_buffer: wgpu::Buffer,
     pub(crate) model_buffer: wgpu::Buffer,
@@ -35,7 +37,7 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn make_plane(ctx: &Context) -> Self {
-        let vertices = &[
+        let vertices = vec![
             Vertex::new(
                 Vec3::new(1.0, 0.0, 1.0),
                 Vec3::new(1.0, 0.5, 1.0),
@@ -61,13 +63,13 @@ impl Mesh {
                 Vec2::new(1.0, 0.0),
             ),
         ];
-        let indices = &[0, 1, 2, 0, 2, 3];
+        let indices = vec![0, 1, 2, 0, 2, 3];
 
         ctx.create_mesh(vertices, indices)
     }
 
     pub fn make_screen_plane(ctx: &Context) -> Self {
-        let vertices = &[
+        let vertices = vec![
             Vertex::new(
                 Vec3::new(1.0, 1.0, 0.0),
                 Vec3::new(1.0, 0.5, 1.0),
@@ -93,13 +95,13 @@ impl Mesh {
                 Vec2::new(1.0, 1.0),
             ),
         ];
-        let indices = &[2, 0, 3, 0, 2, 1];
+        let indices = vec![2, 0, 3, 0, 2, 1];
 
         ctx.create_mesh(vertices, indices)
     }
 
     pub fn make_box(ctx: &Context) -> Self {
-        let vertices = &[
+        let vertices = vec![
             Vertex::new(
                 Vec3::new(1.0, 1.0, 1.0),
                 Vec3::new(1.0, 0.5, 1.0),
@@ -150,7 +152,7 @@ impl Mesh {
             ),
         ];
 
-        let indices = &[
+        let indices = vec![
             // +Y
             0, 1, 2, 0, 2, 3, // +Z
             0, 4, 5, 0, 5, 1, // +X
